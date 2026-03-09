@@ -1,6 +1,6 @@
 // GET /api/arena?trophies=6240  or  GET /api/arena?id=champion
 import { NextRequest, NextResponse } from "next/server";
-import { getArenaMetaInfo, ARENAS } from "@/lib/arenaMeta";
+import { fetchArenaMetaFromDB, ARENAS } from "@/lib/arenaMeta";
 
 export async function GET(req: NextRequest) {
     const trophiesParam = req.nextUrl.searchParams.get("trophies");
@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
 
     try {
         const metaInfo = trophiesParam
-            ? getArenaMetaInfo(parseInt(trophiesParam, 10))
-            : getArenaMetaInfo(idParam!);
+            ? await fetchArenaMetaFromDB(parseInt(trophiesParam, 10))
+            : await fetchArenaMetaFromDB(idParam!);
 
         return NextResponse.json({
             ...metaInfo,
