@@ -1,7 +1,8 @@
 // Clash Royale 公式APIクライアント
 // https://developer.clashroyale.com/
 
-const BASE_URL = "https://api.clashroyale.com/v1";
+// Vercelなどで動的IPからアクセスするための、RoyaleAPI公式プロキシを利用
+const BASE_URL = "https://proxy.royaleapi.dev/v1";
 const TOKEN = process.env.CLASH_API_TOKEN;
 
 function encodeTag(tag: string): string {
