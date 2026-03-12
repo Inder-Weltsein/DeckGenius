@@ -371,16 +371,16 @@ export function generateCoachMessage(
         let reasonText = isStrongAgainst ? "これらに有利な" : "総合的に対応力の高い";
 
         if (winRate < 45) {
-            return `${arenaLabel}では「${ja(top1.cardName)}」・「${ja(top2.cardName)}」が頻出です（${top1.count}回）。${reasonText}「${ja(deck.name)}」に切り替えて巻き返しましょう（TOC ${compatScore}%）。${roleWarning}`;
+            return `${arenaLabel}では「${ja(top1.cardName)}」・「${ja(top2.cardName)}」が頻出です（${top1.count}回）。${reasonText}「${ja(deck.name)}」に切り替えて巻き返しましょう（評価 ${compatScore}点）。${roleWarning}`;
         }
-        return `${arenaLabel}では「${ja(top1.cardName)}」・「${ja(top2.cardName)}」が頻出です（${top1.count}回）。${reasonText}「${ja(deck.name)}」を提案します（TOC ${compatScore}%）。${roleWarning}`;
+        return `${arenaLabel}では「${ja(top1.cardName)}」・「${ja(top2.cardName)}」が頻出です（${top1.count}回）。${reasonText}「${ja(deck.name)}」を提案します（評価 ${compatScore}点）。${roleWarning}`;
     }
 
     if (winRate < 45) {
-        return `${arenaLabel}での直近${totalCount}戦の勝率は ${winRate}% です。TOCスコアが最も高い「${ja(deck.name)}」に切り替えて巻き返しましょう（TOC ${compatScore}%）。${roleWarning}`;
+        return `${arenaLabel}での直近${totalCount}戦の勝率は ${winRate}% です。総合評価が最も高い「${ja(deck.name)}」に切り替えて巻き返しましょう（評価 ${compatScore}点）。${roleWarning}`;
     }
 
-    return `${arenaLabel}での勝率 ${winRate}% をさらに伸ばすため、TOC最高スコアの「${ja(deck.name)}」を提案します（TOC ${compatScore}%）。${roleWarning}`;
+    return `${arenaLabel}での勝率 ${winRate}% をさらに伸ばすため、最高評価の「${ja(deck.name)}」を提案します（評価 ${compatScore}点）。${roleWarning}`;
 }
 
 export async function analyze(

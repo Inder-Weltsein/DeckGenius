@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "DeckGenius — AIが、あなただけの最強デッキを設計する",
@@ -19,7 +20,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className="relative min-h-screen overflow-x-hidden">
+      <body className="relative min-h-screen overflow-x-hidden transition-colors duration-500">
+        <ThemeProvider />
         <div className="relative z-10 min-h-screen">
           {children}
         </div>

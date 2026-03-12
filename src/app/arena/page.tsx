@@ -24,13 +24,15 @@ function ArenaPageInner() {
     const searchParams = useSearchParams();
     const initialTrophies = searchParams.get("trophies");
     const initialArenaId = searchParams.get("id");
+    const initialView = (searchParams.get("view") as ViewMode) || "decks";
 
     const [data, setData] = useState<ApiResponse | null>(null);
     const [selectedArenaId, setSelectedArenaId] = useState<string>(initialArenaId ?? "");
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<ViewMode>("decks");
+    const [viewMode, setViewMode] = useState<ViewMode>(initialView);
     const [cardTypeFilter, setCardTypeFilter] = useState<CardTypeFilter>("all");
     const [rarityFilter, setRarityFilter] = useState<RarityFilter>("all");
+    const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
 
     useEffect(() => {
         const params = initialTrophies
@@ -98,9 +100,11 @@ function ArenaPageInner() {
     if (!data) return null;
 
     return (
-        <main className="min-h-screen pb-16 px-4">
+        <main className="min-h-screen pb-16 px-4 relative overflow-hidden">
+
+
             {/* ヘッダー */}
-            <div className="flex items-center justify-between py-5 max-w-2xl mx-auto">
+            <div className="flex items-center justify-between py-5 max-w-2xl mx-auto relative z-10">
                 <button
                     onClick={() => router.back()}
                     className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
@@ -115,7 +119,7 @@ function ArenaPageInner() {
                 <div className="w-12" />
             </div>
 
-            <div className="max-w-2xl mx-auto flex flex-col gap-5">
+            <div className="max-w-2xl mx-auto flex flex-col gap-5 relative z-10">
                 {/* アリーナセレクター */}
                 <motion.div
                     initial={{ opacity: 0, y: 15 }}
@@ -160,8 +164,8 @@ function ArenaPageInner() {
                     <div className="flex items-center gap-3 mb-3">
                         <span className="text-2xl">{data.arena.icon}</span>
                         <div>
-                            <h2 className="text-white font-bold text-lg">{data.arena.name}</h2>
-                            <p className="text-gray-500 text-xs">
+                            <h2 className="text-[var(--text-main)] font-bold text-lg">{data.arena.name}</h2>
+                            <p className="text-[var(--text-muted)] text-xs">
                                 {data.arena.trophyMin.toLocaleString()} 〜 {data.arena.trophyMax < 99999 ? data.arena.trophyMax.toLocaleString() : "∞"} トロフィー
                             </p>
                         </div>
@@ -170,7 +174,7 @@ function ArenaPageInner() {
                     {/* 流行カードTOP5 */}
                     <div className="flex items-center gap-2">
                         <Flame className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                        <span className="text-xs text-gray-500 flex-shrink-0">流行カード:</span>
+                        <span className="text-xs text-[var(--text-muted)] flex-shrink-0">流行カード:</span>
                         <div className="flex gap-1.5 flex-wrap">
                             {data.hotCards.map((card) => (
                                 <span
@@ -196,7 +200,7 @@ function ArenaPageInner() {
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
                         style={viewMode === "decks"
                             ? { background: "linear-gradient(135deg, #7c3aed55, #0dccf255)", border: "1px solid rgba(13,204,242,0.5)", color: "#fff" }
-                            : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#9ca3af" }
+                            : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-muted)" }
                         }
                     >
                         <Crown className="w-3 h-3" />
@@ -207,7 +211,7 @@ function ArenaPageInner() {
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
                         style={viewMode === "cards"
                             ? { background: "linear-gradient(135deg, #f9731655, #fbbf2455)", border: "1px solid rgba(249,115,22,0.5)", color: "#fff" }
-                            : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#9ca3af" }
+                            : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-muted)" }
                         }
                     >
                         <BarChart3 className="w-3 h-3" />
@@ -219,69 +223,123 @@ function ArenaPageInner() {
                     {viewMode === "decks" ? (
                         /* ===== TOP8 デッキリスト ===== */
                         <motion.div key="decks-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
+                            <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-3">
                                 TOP {data.topDecks.length} デッキ
                             </p>
                             <div className="flex flex-col gap-3">
                                 {data.topDecks.map((deck, idx) => (
                                     <motion.div
                                         key={deck.deckId}
-                                        className="glass-card p-4"
+                                        className="glass-card overflow-hidden"
                                         style={{ borderColor: idx === 0 ? "rgba(250,204,21,0.2)" : "rgba(255,255,255,0.06)" }}
                                         initial={{ opacity: 0, y: 8 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: idx * 0.05 }}
                                     >
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-2.5">
-                                                <span
-                                                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                                                    style={{
-                                                        background: idx === 0 ? "rgba(250,204,21,0.2)" : "rgba(255,255,255,0.06)",
-                                                        color: idx === 0 ? "#fbbf24" : "#9ca3af",
-                                                    }}
-                                                >
-                                                    {idx + 1}
-                                                </span>
-                                                <div>
-                                                    <p className="text-sm font-bold text-white">{deck.deckName}</p>
-                                                    <p className="text-xs text-gray-600">
-                                                        {deck.archetype} • 平均{deck.avgElixir}エリクサー
-                                                    </p>
+                                        <div
+                                            className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                                            onClick={() => setExpandedDeckId(prev => prev === deck.deckId ? null : deck.deckId)}
+                                        >
+                                            <div className="flex items-center justify-between mb-2 sm:mb-0">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span
+                                                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                                                        style={{
+                                                            background: idx === 0 ? "rgba(250,204,21,0.2)" : "rgba(255,255,255,0.06)",
+                                                            color: idx === 0 ? "#fbbf24" : "#9ca3af",
+                                                        }}
+                                                    >
+                                                        {idx + 1}
+                                                    </span>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-[var(--text-main)]">{deck.deckName}</p>
+                                                        <p className="text-[10px] sm:text-xs text-[var(--text-muted)]">
+                                                            {deck.archetype} • 平均{deck.avgElixir}エリクサー
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-xs">
+                                                    <div className="text-right">
+                                                        <p className="font-bold" style={{ color: deck.winRate >= 55 ? "#4ade80" : deck.winRate >= 52 ? "#fbbf24" : "var(--text-muted)" }}>
+                                                            {deck.winRate}%
+                                                        </p>
+                                                        <p className="text-[10px] text-[var(--text-muted)]">勝率</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-bold text-cyan-400">{deck.useRate}%</p>
+                                                        <p className="text-[10px] text-[var(--text-muted)]">使用率</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        {trendIcon(deck.trend)}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3 text-xs">
-                                                <div className="text-right">
-                                                    <p className="font-bold" style={{ color: deck.winRate >= 55 ? "#4ade80" : deck.winRate >= 52 ? "#fbbf24" : "#94a3b8" }}>
-                                                        {deck.winRate}%
-                                                    </p>
-                                                    <p className="text-gray-600">勝率</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-bold text-cyan-400">{deck.useRate}%</p>
-                                                    <p className="text-gray-600">使用率</p>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    {trendIcon(deck.trend)}
-                                                </div>
-                                            </div>
+
+                                            {/* Condensed cards view for mobile or when collapsed */}
+                                            <AnimatePresence>
+                                                {expandedDeckId !== deck.deckId && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: "auto" }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        className="flex gap-1 flex-wrap mt-2 sm:ml-11"
+                                                    >
+                                                        {deck.cards.map((card) => (
+                                                            <span
+                                                                key={card}
+                                                                className="px-1.5 py-0.5 rounded text-[10px]"
+                                                                style={{
+                                                                    background: "rgba(255,255,255,0.04)",
+                                                                    border: "1px solid rgba(255,255,255,0.06)",
+                                                                    color: "var(--text-muted)",
+                                                                }}
+                                                            >
+                                                                {ja(card)}
+                                                            </span>
+                                                        ))}
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
-                                        <div className="flex gap-1 flex-wrap">
-                                            {deck.cards.map((card) => (
-                                                <span
-                                                    key={card}
-                                                    className="px-1.5 py-0.5 rounded text-xs"
-                                                    style={{
-                                                        background: "rgba(255,255,255,0.04)",
-                                                        border: "1px solid rgba(255,255,255,0.06)",
-                                                        color: "#9ca3af",
-                                                        fontSize: "0.65rem",
-                                                    }}
+
+                                        <AnimatePresence>
+                                            {expandedDeckId === deck.deckId && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: "auto", opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                                    className="border-t border-white/5 bg-[var(--glass-bg)]"
                                                 >
-                                                    {ja(card)}
-                                                </span>
-                                            ))}
-                                        </div>
+                                                    <div className="p-4 grid grid-cols-4 sm:grid-cols-8 gap-2">
+                                                        {deck.cards.map((cardName, _i) => {
+                                                            const slug = cardName.toLowerCase().replace(/['.]/g, '').replace(/\s+/g, '-');
+                                                            const iconUrl = `https://royaleapi.github.io/cr-api-assets/cards/${slug}.png`;
+                                                            return (
+                                                                <motion.div
+                                                                    key={cardName}
+                                                                    className="glass-card flex flex-col items-center gap-1 p-1 sm:p-2 relative overflow-hidden"
+                                                                    style={{ borderColor: "rgba(255,255,255,0.06)" }}
+                                                                    initial={{ opacity: 0, scale: 0.9 }}
+                                                                    animate={{ opacity: 1, scale: 1 }}
+                                                                    transition={{ delay: _i * 0.03 }}
+                                                                >
+                                                                    <img
+                                                                        src={iconUrl}
+                                                                        alt={cardName}
+                                                                        className="w-full aspect-square object-contain rounded-lg relative z-10"
+                                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                                                    />
+                                                                    <p className="text-[var(--text-muted)] text-center leading-none mt-1" style={{ fontSize: "0.55rem" }}>
+                                                                        {ja(cardName)}
+                                                                    </p>
+                                                                </motion.div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </motion.div>
                                 ))}
                             </div>
@@ -292,8 +350,8 @@ function ArenaPageInner() {
                             {/* フィルター */}
                             <div className="flex flex-col gap-3 mb-4">
                                 <div className="flex items-center gap-2">
-                                    <Filter className="w-3.5 h-3.5 text-gray-500" />
-                                    <span className="text-xs text-gray-500">タイプ:</span>
+                                    <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                    <span className="text-xs text-[var(--text-muted)]">タイプ:</span>
                                     <div className="flex gap-1.5 flex-wrap">
                                         {([
                                             ["all", "すべて"],
@@ -307,7 +365,7 @@ function ArenaPageInner() {
                                                 className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
                                                 style={cardTypeFilter === val
                                                     ? { background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.4)", color: "#fb923c" }
-                                                    : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#6b7280" }
+                                                    : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-muted)" }
                                                 }
                                             >
                                                 {label}
@@ -316,8 +374,8 @@ function ArenaPageInner() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Filter className="w-3.5 h-3.5 text-gray-500" />
-                                    <span className="text-xs text-gray-500">レア度:</span>
+                                    <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                    <span className="text-xs text-[var(--text-muted)]">レア度:</span>
                                     <div className="flex gap-1.5 flex-wrap">
                                         {([
                                             ["all", "すべて"],
@@ -333,7 +391,7 @@ function ArenaPageInner() {
                                                 className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
                                                 style={rarityFilter === val
                                                     ? { background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.4)", color: "#a78bfa" }
-                                                    : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#6b7280" }
+                                                    : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-muted)" }
                                                 }
                                             >
                                                 {label}
@@ -343,7 +401,7 @@ function ArenaPageInner() {
                                 </div>
                             </div>
 
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
+                            <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-3">
                                 カード使用率ランキング（{filteredCards.length}件）
                             </p>
 
@@ -368,14 +426,14 @@ function ArenaPageInner() {
                                         {/* カード名 + レア度バッジ */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <p className="text-sm font-semibold text-white truncate">{ja(card.name)}</p>
+                                                <p className="text-sm font-semibold text-[var(--text-main)] truncate">{ja(card.name)}</p>
                                                 <span
                                                     className="px-1.5 py-0.5 rounded text-xs flex-shrink-0"
                                                     style={{ fontSize: "0.6rem", background: `${rarityColor(card.rarity)}15`, color: rarityColor(card.rarity), border: `1px solid ${rarityColor(card.rarity)}30` }}
                                                 >
                                                     {card.rarity === "champion" ? "C" : card.rarity === "legendary" ? "UR" : card.rarity === "epic" ? "SR" : card.rarity === "rare" ? "R" : "N"}
                                                 </span>
-                                                <span className="text-xs text-gray-600 flex-shrink-0">
+                                                <span className="text-xs text-[var(--text-muted)] flex-shrink-0">
                                                     {card.type === "spell" ? "呪文" : card.type === "building" ? "建物" : "ユニット"}
                                                 </span>
                                             </div>
@@ -384,7 +442,7 @@ function ArenaPageInner() {
                                         {/* 使用率バー */}
                                         <div className="w-28 flex-shrink-0">
                                             <div className="flex items-center justify-between mb-1">
-                                                <span className="text-xs text-gray-500">使用率</span>
+                                                <span className="text-xs text-[var(--text-muted)]">使用率</span>
                                                 <span className="text-xs font-bold text-cyan-400">{card.usageRate}%</span>
                                             </div>
                                             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
@@ -397,10 +455,10 @@ function ArenaPageInner() {
 
                                         {/* 勝率 */}
                                         <div className="w-14 text-right flex-shrink-0">
-                                            <p className="text-xs font-bold" style={{ color: card.winRate >= 55 ? "#4ade80" : card.winRate >= 52 ? "#fbbf24" : "#94a3b8" }}>
+                                            <p className="text-xs font-bold" style={{ color: card.winRate >= 55 ? "#4ade80" : card.winRate >= 52 ? "#fbbf24" : "var(--text-muted)" }}>
                                                 {card.winRate}%
                                             </p>
-                                            <p className="text-gray-600" style={{ fontSize: "0.6rem" }}>勝率</p>
+                                            <p className="text-[var(--text-muted)]" style={{ fontSize: "0.6rem" }}>勝率</p>
                                         </div>
 
                                         {/* トレンド */}
@@ -408,7 +466,7 @@ function ArenaPageInner() {
                                     </motion.div>
                                 ))}
                                 {filteredCards.length === 0 && (
-                                    <p className="text-gray-500 text-sm text-center py-8">該当するカードが見つかりません</p>
+                                    <p className="text-[var(--text-muted)] text-sm text-center py-8">該当するカードが見つかりません</p>
                                 )}
                             </div>
                         </motion.div>

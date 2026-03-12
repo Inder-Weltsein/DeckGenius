@@ -93,17 +93,19 @@ export default function ResultPage() {
     // TOC ScoreBreakdown バー用
     const currentBreakdown = activeTab === 0 ? scoreBreakdown : (activeDeck as any)?.scoreBreakdown;
     const breakdownItems = currentBreakdown ? [
-        { label: "育成", value: currentBreakdown.growthScore, color: "#0dccf2" },
-        { label: "環境", value: currentBreakdown.metaScore, color: "#4ade80" },
-        { label: "役割", value: currentBreakdown.roleScore, color: "#f97316" },
-        { label: "シナジー", value: currentBreakdown.synergyScore, color: "#a78bfa" },
-        { label: "コスト", value: currentBreakdown.costScore, color: "#fbbf24" },
+        { label: "カードレベル（育成度）", value: currentBreakdown.growthScore, color: "#0dccf2" },
+        { label: "現環境への適応力", value: currentBreakdown.metaScore, color: "#4ade80" },
+        { label: "攻守バランス", value: currentBreakdown.roleScore, color: "#f97316" },
+        { label: "カード間の相性", value: currentBreakdown.synergyScore, color: "#a78bfa" },
+        { label: "エリクサー効率", value: currentBreakdown.costScore, color: "#fbbf24" },
     ] : [];
 
     return (
-        <main className="min-h-screen pb-16 px-4">
+        <main className="min-h-screen pb-16 px-4 relative overflow-hidden flex flex-col items-center w-full">
+
+
             {/* ヘッダー */}
-            <div className="flex items-center justify-between py-5 max-w-lg mx-auto">
+            <div className="flex items-center justify-between py-5 w-full max-w-lg mx-auto relative z-10">
                 <button onClick={() => router.push("/")} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm">
                     <ArrowLeft className="w-4 h-4" />
                     戻る
@@ -120,7 +122,7 @@ export default function ResultPage() {
                 )}
             </div>
 
-            <div className="max-w-lg mx-auto flex flex-col gap-5">
+            <div className="w-full max-w-lg mx-auto flex flex-col gap-5 relative z-10">
                 {/* アリーナバッジ */}
                 {arena && (
                     <motion.div
@@ -173,12 +175,12 @@ export default function ResultPage() {
                         <details className="glass-card p-4" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
                             <summary className="text-xs font-semibold text-gray-500 uppercase tracking-widest cursor-pointer select-none flex items-center gap-2">
                                 <BarChart3 className="w-3 h-3" />
-                                TOC スコア内訳（TruthOfCrown）
+                                デッキ総合評価（DeckGenius）
                             </summary>
                             <div className="mt-3 flex flex-col gap-2">
                                 {breakdownItems.map(({ label, value, color }) => (
                                     <div key={label} className="flex items-center gap-3">
-                                        <span className="text-xs text-gray-500 w-20 flex-shrink-0">{label}</span>
+                                        <span className="text-[10px] md:text-xs text-gray-500 w-28 md:w-32 flex-shrink-0">{label}</span>
                                         <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
                                             <motion.div
                                                 className="h-full rounded-full"
@@ -238,29 +240,47 @@ export default function ResultPage() {
                                 return a.origIndex - b.origIndex;
                             })
                             .map(({ card }, _i) => {
-                                const isChampion = getCardDef(card.name)?.rarity === "champion";
+                                const rarity = getCardDef(card.name)?.rarity || "common";
+                                const isChampion = rarity === "champion";
+                                const isLegendary = rarity === "legendary";
+                                const isEpic = rarity === "epic";
+                                const isRare = rarity === "rare";
                                 const isEvo = card.evolutionLevel && card.evolutionLevel > 0;
                                 const iconUrl = isEvo && card.iconUrls?.evolutionMedium ? card.iconUrls.evolutionMedium : card.iconUrls?.medium;
+
+                                let borderColor = "rgba(148,163,184,0.3)"; // common
+                                let boxShadow = "none";
+                                let bgDecor = null;
+
+                                if (isEvo) {
+                                    borderColor = "rgba(168,85,247,0.6)";
+                                    boxShadow = "0 0 15px rgba(168,85,247,0.3)";
+                                    bgDecor = <div className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ background: "radial-gradient(circle at center, rgba(168,85,247,0.15) 0%, transparent 70%)" }} />;
+                                } else if (isChampion) {
+                                    borderColor = "rgba(250,204,21,0.6)";
+                                    boxShadow = "0 0 15px rgba(250,204,21,0.2)";
+                                    bgDecor = <div className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ background: "radial-gradient(circle at center, rgba(250,204,21,0.1) 0%, transparent 70%)" }} />;
+                                } else if (isLegendary) {
+                                    borderColor = "rgba(14,165,233,0.5)";
+                                    boxShadow = "0 0 10px rgba(14,165,233,0.2)";
+                                    bgDecor = <div className="absolute top-0 left-0 w-full h-full pointer-events-none border-[2px] border-cyan-400/20" style={{ background: "linear-gradient(135deg, rgba(14,165,233,0.05), rgba(250,204,21,0.05))" }} />;
+                                } else if (isEpic) {
+                                    borderColor = "rgba(216,180,254,0.4)";
+                                } else if (isRare) {
+                                    borderColor = "rgba(253,186,116,0.3)";
+                                }
 
                                 return (
                                     <motion.div
                                         key={card.name}
                                         className="glass-card flex flex-col items-center gap-1 p-2 relative overflow-hidden"
-                                        style={{
-                                            borderColor: isEvo ? "rgba(168,85,247,0.5)" : (isChampion ? "rgba(250,204,21,0.5)" : "rgba(13,204,242,0.15)"),
-                                            boxShadow: isEvo ? "0 0 10px rgba(168,85,247,0.2)" : (isChampion ? "0 0 10px rgba(250,204,21,0.15)" : "none"),
-                                        }}
+                                        style={{ borderColor, boxShadow }}
                                         initial={{ opacity: 0, scale: 0.85 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         transition={{ delay: _i * 0.04 }}
                                         whileHover={{ scale: 1.05 }}
                                     >
-                                        {isEvo && (
-                                            <div className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ background: "radial-gradient(circle at center, rgba(168,85,247,0.15) 0%, transparent 70%)" }} />
-                                        )}
-                                        {isChampion && (
-                                            <div className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ background: "radial-gradient(circle at center, rgba(250,204,21,0.1) 0%, transparent 70%)" }} />
-                                        )}
+                                        {bgDecor}
 
                                         {iconUrl ? (
                                             // eslint-disable-next-line @next/next/no-img-element
@@ -320,7 +340,7 @@ export default function ResultPage() {
                     >
                         <div className="flex items-center gap-2 mb-3">
                             <AlertTriangle className="w-4 h-4 text-orange-400" />
-                            <span className="text-xs font-semibold text-orange-400 uppercase tracking-widest">TOC デッキチェッカー</span>
+                            <span className="text-xs font-semibold text-orange-400 uppercase tracking-widest">デッキ・コンストラクト・チェッカー</span>
                         </div>
                         <div className="flex flex-col gap-2">
                             {((currentDeck as any).deckSuggestions as string[]).map((suggestion, i) => (
