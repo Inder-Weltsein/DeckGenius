@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPlayer, getBattleLog } from "@/lib/clashApi";
 import { analyze } from "@/lib/analyzer";
 import { getArenaByTrophies, fetchArenaMetaFromDB } from "@/lib/arenaMeta";
+import { saveBattleLog } from "@/lib/engine/battleCollector";
 
 // APIトークンが有効かチェック
 function isValidToken(token: string | undefined): boolean {
@@ -41,6 +42,17 @@ async function fetchAndAnalyze(tag: string) {
         getPlayer(tag),
         getBattleLog(tag),
     ]);
+
+    // BFS副次保存: バトルログをDBに非同期保存（レスポンスは待たない）
+    saveBattleLog(player.tag ?? tag, player.trophies, battles)
+        .then(({ saved, newPlayers }) => {
+            if (saved > 0) {
+                console.log(`[BFS] ${saved}試合保存, ${newPlayers}名の新規プレイヤー発見`);
+            }
+        })
+        .catch(err => {
+            console.warn("[BFS] バトルログ保存エラー:", err);
+        });
 
     return await analyze(player.name, player.trophies, player.cards, battles, player.arena);
 }

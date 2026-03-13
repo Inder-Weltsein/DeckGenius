@@ -1,8 +1,12 @@
 {
     "crons": [
         {
-            "path": "/api/cron/update-meta",
-            "schedule": "0 0 * * *"
+            "path": "/api/cron/collect-battles",
+            "schedule": "0 */6 * * *"
+        },
+        {
+            "path": "/api/cron/aggregate-trends",
+            "schedule": "30 */6 * * *"
         }
     ]
 }
