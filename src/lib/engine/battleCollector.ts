@@ -25,6 +25,23 @@ function getArenaCategoryId(trophies: number): string {
 }
 
 /**
+ * Clash Royale固有の時刻文字列 "20240313T123456.000Z" を標準のDateに変換する
+ */
+function parseCRTime(timeStr: string): Date {
+    if (!timeStr || timeStr.length < 15) return new Date();
+    // すでにISO8601形式（ハイフン入り）ならそのまま解釈
+    if (timeStr.includes("-")) return new Date(timeStr);
+    
+    const y = timeStr.substring(0, 4);
+    const m = timeStr.substring(4, 6);
+    const d = timeStr.substring(6, 8);
+    const h = timeStr.substring(9, 11);
+    const min = timeStr.substring(11, 13);
+    const sec = timeStr.substring(13, 15);
+    return new Date(`${y}-${m}-${d}T${h}:${min}:${sec}.000Z`);
+}
+
+/**
  * バトルログをDBに非同期保存する
  * 採否ゲート準拠: 7日以内のPvPバトルのみ保存
  *
@@ -48,7 +65,7 @@ export async function saveBattleLog(
         if (battle.type !== "PvP" && battle.type !== "pathOfLegend") continue;
 
         // ゲート1: 鮮度チェック — 7日以内
-        const battleTime = new Date(battle.battleTime);
+        const battleTime = parseCRTime(battle.battleTime);
         if (battleTime < sevenDaysAgo) continue;
 
         const team = battle.team?.[0];
