@@ -51,6 +51,7 @@ export interface AnalysisResult {
         scoreBreakdown: ScoreBreakdown;
         roleCheck: RoleCheckResult;
         deckSuggestions: string[];
+        inferredArchetypeId?: number | null;
     };
     alternativeDecks: {
         meta: MetaDeck;
@@ -59,6 +60,7 @@ export interface AnalysisResult {
         scoreBreakdown: ScoreBreakdown;
         roleCheck: RoleCheckResult;
         deckSuggestions: string[];
+        inferredArchetypeId?: number | null;
     }[];
     localMeta: { cardName: string; count: number }[];
     upgradePriority: UpgradeCard[];
@@ -240,6 +242,7 @@ export async function analyze(
         scoreBreakdown: toCompatibleBreakdown(s.breakdown),
         roleCheck: s.roleCheck,
         deckSuggestions: generateDeckSuggestions(s.roleCheck),
+        inferredArchetypeId: s.inferredArchetypeId,
     }));
 
     return {
@@ -255,6 +258,7 @@ export async function analyze(
             scoreBreakdown: toCompatibleBreakdown(best.breakdown),
             roleCheck: best.roleCheck,
             deckSuggestions,
+            inferredArchetypeId: best.inferredArchetypeId,
         },
         alternativeDecks,
         localMeta: localMeta.slice(0, 5),

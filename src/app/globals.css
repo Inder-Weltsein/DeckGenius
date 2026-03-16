@@ -136,3 +136,89 @@ body::before {
   background: rgba(13, 204, 242, 0.3);
   border-radius: 99px;
 }
+
+/* =============================================
+   UI Refresh: Neon Clash v2 additions
+   ============================================= */
+
+:root {
+  --accent-gold: #f5b942;       /* クラロワゴールド */
+  --accent-green: #4ade80;      /* 勝率グリーン */
+}
+
+/* ---- ネオングラデーションバー ---- */
+.neon-bar-track {
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.neon-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #0dccf2, #a60df2);
+  box-shadow: 0 0 8px rgba(13, 204, 242, 0.5);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---- AIチャットバブル ---- */
+.coach-bubble {
+  background: linear-gradient(135deg, rgba(13, 204, 242, 0.05), rgba(166, 13, 242, 0.05));
+  border: 1px solid rgba(13, 204, 242, 0.25);
+  border-left: 3px solid #0dccf2;
+  border-radius: 0 16px 16px 16px;
+}
+
+/* ---- スコアゲージ（SVGリング）アニメー ション ---- */
+@keyframes gauge-fill {
+  from { stroke-dashoffset: 565; }
+  to   { stroke-dashoffset: var(--dash-offset); }
+}
+
+@keyframes gauge-pulse {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(13, 204, 242, 0.6)); }
+  50%       { filter: drop-shadow(0 0 16px rgba(13, 204, 242, 0.9)); }
+}
+
+.score-gauge-ring {
+  animation: gauge-fill 1s ease-out forwards, gauge-pulse 2s ease-in-out 1s infinite;
+}
+
+/* ---- ゴールドバッジ ---- */
+.badge-gold {
+  background: linear-gradient(135deg, rgba(245, 185, 66, 0.2), rgba(245, 185, 66, 0.05));
+  border: 1px solid rgba(245, 185, 66, 0.5);
+  color: var(--accent-gold);
+}
+
+.badge-gold-solid {
+  background: linear-gradient(135deg, #f5b942, #d4930a);
+  color: #0b0f19;
+  font-weight: 700;
+}
+
+/* ---- アーキタイプバッジ ---- */
+.archetype-badge {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+/* ---- Shine animation for cards ---- */
+@keyframes card-shine {
+  from { transform: translateX(-100%) skewX(-20deg); }
+  to   { transform: translateX(200%) skewX(-20deg); }
+}
+
+.card-shine::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 40%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  animation: card-shine 3s ease-in-out infinite;
+}

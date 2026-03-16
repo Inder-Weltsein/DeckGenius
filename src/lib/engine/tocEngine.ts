@@ -14,6 +14,7 @@ import { isPlayable } from "./hardFilter";
 import { getArenaTier, getTOCWeights, type ArenaTier } from "./arenaWeights";
 import { generateDeckKey } from "./deckKey";
 import { supabase } from "../supabaseClient";
+import { deckToVector } from "./embedding/vectorize";
 
 // ===== 型定義 =====
 
@@ -32,6 +33,7 @@ export interface ScoredDeck {
     roleCheck: RoleCheckResult;
     sampleCount: number;
     filterReason?: string;
+    inferredArchetypeId?: number | null; // 動的割り当てされたアーキタイプID
 }
 
 // ===== ヘルパー: 絶対レベル変換 =====
@@ -131,27 +133,78 @@ async function calcMetaScore(
     localMeta: { cardName: string; count: number }[],
     lossMeta: Record<string, number>,
     battleCount: number
-): Promise<{ score: number; sampleCount: number }> {
+): Promise<{ score: number; sampleCount: number; inferredArchetypeId?: number | null }> {
     // DBからComposite Scoreを取得
     const deckKey = generateDeckKey(metaDeck.cards);
     let dbScore = 50; // 未登録デッキ = 中立50点（バイアスなし）
     let sampleCount = 0;
+    let inferredArchetypeId: number | null = null;
 
     try {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from("trend_scores")
             .select("composite_score, sample_count")
             .eq("arena_id", arenaId)
             .eq("deck_key", deckKey)
             .single();
 
+        if (error) {
+            throw error;
+        }
+
         if (data) {
             dbScore = data.composite_score ?? 50;
             sampleCount = data.sample_count ?? 0;
+            // 既知のデッキはmetaDeck.archetypeが存在するため、動的IDはnullにする
         }
-    } catch {
-        // DB取得失敗 → globalWinRateをフォールバック
-        dbScore = Math.min(100, Math.max(0, (metaDeck.globalWinRate - 45) * 6.67));
+    } catch (err: any) {
+        // PGRST116 (No rows found) の場合は未登録（新興デッキ）とみなす
+        if (err.code === "PGRST116") {
+            try {
+                // 1. 新興デッキのAIベクトル化
+                const queryVector = await deckToVector(metaDeck.cards);
+
+                // 2. [並行処理] 近傍類似スコア予測 ＆ アーキタイプ推測
+                const [similarRes, archetypeRes] = await Promise.all([
+                    supabase.rpc("find_similar_decks", { 
+                        query_embedding: `[${queryVector.join(',')}]`, 
+                        target_arena_id: arenaId,
+                        match_count: 5 
+                    }),
+                    supabase.rpc("find_archetype", {
+                        query_embedding: `[${queryVector.join(',')}]`,
+                        similarity_threshold: 0.85
+                    })
+                ]);
+
+                // 類似デッキから加重平均スコアの計算
+                if (similarRes.data && Array.isArray(similarRes.data) && similarRes.data.length > 0) {
+                    let totalWeightedScore = 0;
+                    let totalWeight = 0;
+                    for (const row of similarRes.data) {
+                        const weight = Math.max(0, row.similarity); // 類似度を重みとする
+                        totalWeightedScore += row.composite_score * weight;
+                        totalWeight += weight;
+                    }
+                    if (totalWeight > 0) {
+                        dbScore = totalWeightedScore / totalWeight;
+                        // console.log(`[tocEngine] 推定スコア: ${dbScore.toFixed(2)} (${similarRes.data.length}件の類似から推論)`);
+                    }
+                }
+
+                // アーキタイプIDの動的割り当て
+                if (archetypeRes.data !== null && typeof archetypeRes.data === 'number') {
+                    inferredArchetypeId = archetypeRes.data;
+                }
+
+            } catch (fallbackErr) {
+                console.error("[tocEngine] フォールバック推論エラー:", fallbackErr);
+                dbScore = Math.min(100, Math.max(0, (metaDeck.globalWinRate - 45) * 6.67));
+            }
+        } else {
+            console.error("[tocEngine] DB取得エラー:", err);
+            dbScore = Math.min(100, Math.max(0, (metaDeck.globalWinRate - 45) * 6.67));
+        }
     }
 
     // ローカルメタ補正（±15点上限、10戦未満は適用しない）
@@ -176,7 +229,7 @@ async function calcMetaScore(
     }
 
     const score = Math.min(100, Math.max(0, Math.round(dbScore + localAdjust)));
-    return { score, sampleCount };
+    return { score, sampleCount, inferredArchetypeId };
 }
 
 // ===== ③ 構造スコア (0〜100) =====
@@ -281,7 +334,7 @@ export async function calcTOCScore(
 
     // Step 2: 4軸スコアリング
     const { score: growthScore, resolvedCards } = calcGrowthScore(metaDeck, playerCards);
-    const { score: metaScore, sampleCount } = await calcMetaScore(metaDeck, arenaId, localMeta, lossMeta, battleCount);
+    const { score: metaScore, sampleCount, inferredArchetypeId } = await calcMetaScore(metaDeck, arenaId, localMeta, lossMeta, battleCount);
     const structureScore = calcStructureScore(metaDeck, playerCards, arenaAirDeckRatio);
     const costScore = calcCostScore(metaDeck);
 
@@ -307,5 +360,6 @@ export async function calcTOCScore(
         breakdown: { growthScore, metaScore, structureScore, costScore },
         roleCheck,
         sampleCount,
+        inferredArchetypeId
     };
 }

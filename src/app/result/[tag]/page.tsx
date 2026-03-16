@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Trophy, Bot, Sparkles, Copy, Check, BarChart3, ExternalLink, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Trophy, Sparkles, Copy, Check, BarChart3, ExternalLink, AlertTriangle } from "lucide-react";
 import type { AnalysisResult } from "@/lib/analyzer";
 import type { CRCard } from "@/lib/clashApi";
 import { ja, getCardDef } from "@/lib/cards";
+import { NeonGauge } from "@/components/NeonGauge";
+import { NeonBar } from "@/components/NeonBar";
+import { CoachBubble } from "@/components/CoachBubble";
 type ApiResponse = AnalysisResult & { _demo?: boolean; error?: string };
 
 export default function ResultPage() {
@@ -51,7 +54,7 @@ export default function ResultPage() {
                 <div className="relative w-20 h-20">
                     <div className="absolute inset-0 rounded-full border-2 animate-spin" style={{ borderColor: "#0dccf2 transparent transparent transparent" }} />
                     <div className="absolute inset-3 rounded-full border-2 animate-spin" style={{ borderColor: "transparent #a60df2 transparent transparent", animationDirection: "reverse", animationDuration: "0.8s" }} />
-                    <Bot className="absolute inset-0 m-auto w-7 h-7 text-cyan-400" />
+                    <div className="absolute inset-0 m-auto w-7 h-7 flex items-center justify-center text-2xl">⚔️</div>
                 </div>
                 <div className="text-center">
                     <p className="text-gray-300 font-medium">AIが分析中...</p>
@@ -92,12 +95,11 @@ export default function ResultPage() {
 
     // TOC ScoreBreakdown バー用
     const currentBreakdown = activeTab === 0 ? scoreBreakdown : (activeDeck as any)?.scoreBreakdown;
-    const breakdownItems = currentBreakdown ? [
-        { label: "カードレベル（育成度）", value: currentBreakdown.growthScore, color: "#0dccf2" },
-        { label: "現環境への適応力", value: currentBreakdown.metaScore, color: "#4ade80" },
-        { label: "攻守バランス", value: currentBreakdown.roleScore, color: "#f97316" },
-        { label: "カード間の相性", value: currentBreakdown.synergyScore, color: "#a78bfa" },
-        { label: "エリクサー効率", value: currentBreakdown.costScore, color: "#fbbf24" },
+    const breakdownBars = currentBreakdown ? [
+        { label: "カードレベル（育成度）", value: currentBreakdown.growthScore,   color: "cyan-purple" as const },
+        { label: "現環境への適応力",       value: currentBreakdown.metaScore,     color: "green" as const },
+        { label: "攻守バランス",           value: currentBreakdown.roleScore,     color: "orange" as const },
+        { label: "エリクサー効率",         value: currentBreakdown.costScore,     color: "gold" as const },
     ] : [];
 
     return (
@@ -150,51 +152,40 @@ export default function ResultPage() {
                     </motion.div>
                 )}
 
-                {/* AIコーチメッセージ */}
-                <motion.div className="glass-card p-5" style={{ borderColor: "rgba(13,204,242,0.2)" }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-                    <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #7c3aed, #0dccf2)" }}>
-                            <Bot className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wide">DeckGenius コーチ</span>
-                                <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                    適合度 {primaryScore}%
-                                </span>
-                            </div>
-                            <p className="text-gray-300 text-sm leading-relaxed">{coachMessage}</p>
-                        </div>
-                    </div>
-                </motion.div>
+                {/* ===== AIコーチチャットバブル（新デザイン） ===== */}
+                <CoachBubble message={coachMessage} score={primaryScore} delay={0.1} />
 
-                {/* ScoreBreakdown バー */}
-                {breakdownItems.length > 0 && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-                        <details className="glass-card p-4" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-                            <summary className="text-xs font-semibold text-gray-500 uppercase tracking-widest cursor-pointer select-none flex items-center gap-2">
-                                <BarChart3 className="w-3 h-3" />
-                                デッキ総合評価（DeckGenius）
-                            </summary>
-                            <div className="mt-3 flex flex-col gap-2">
-                                {breakdownItems.map(({ label, value, color }) => (
-                                    <div key={label} className="flex items-center gap-3">
-                                        <span className="text-[10px] md:text-xs text-gray-500 w-28 md:w-32 flex-shrink-0">{label}</span>
-                                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                                            <motion.div
-                                                className="h-full rounded-full"
-                                                style={{ background: color }}
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${value}%` }}
-                                                transition={{ delay: 0.3, duration: 0.6 }}
-                                            />
-                                        </div>
-                                        <span className="text-xs font-bold w-8 text-right" style={{ color }}>{Math.round(value)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </details>
+                {/* ===== スコアゲージ ＋ ネオンバー（新デザイン） ===== */}
+                {breakdownBars.length > 0 && (
+                    <motion.div
+                        className="glass-card p-5 flex flex-col gap-4"
+                        style={{ borderColor: "rgba(13,204,242,0.18)" }}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                    >
+                        {/* スコアゲージを中央に配置 */}
+                        <div className="flex justify-center">
+                            <NeonGauge
+                                score={primaryScore}
+                                size={148}
+                                label={`${primaryMeta.name}`}
+                                sublabel="DECK SCORE"
+                            />
+                        </div>
+
+                        <div className="h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+
+                        {/* ネオンバー4軸 */}
+                        <div className="flex items-center gap-2 mb-1">
+                            <BarChart3 className="w-3 h-3 text-gray-500" />
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">スコア詳細</span>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                            {breakdownBars.map(({ label, value, color }, i) => (
+                                <NeonBar key={label} label={label} value={value} color={color} delay={i * 0.08} />
+                            ))}
+                        </div>
                     </motion.div>
                 )}
 
