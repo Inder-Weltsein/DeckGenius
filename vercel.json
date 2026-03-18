@@ -7,10 +7,6 @@
         {
             "path": "/api/cron/aggregate-trends",
             "schedule": "30 */6 * * *"
-        },
-        {
-            "path": "/api/cron/update-embeddings",
-            "schedule": "45 */6 * * *"
         }
     ]
 }
