@@ -3,13 +3,30 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Zap, Shield, TrendingUp } from "lucide-react";
+import { Search, Zap, Shield, TrendingUp, ChevronRight } from "lucide-react";
+
+// Vercel が自動設定するビルド情報（ローカルでは undefined）
+const APP_VERSION = "1.0.0";
+const COMMIT_SHA = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";
+const BUILD_DATE = new Date().toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit" });
+
+// アリーナ帯クイック選択リスト
+const QUICK_ARENAS = [
+  { id: "beginner",    label: "入門",        icon: "🏟️", trophyRange: "0〜999" },
+  { id: "challenger",  label: "チャレンジャー", icon: "⚔️", trophyRange: "1000〜3999" },
+  { id: "master",      label: "マスター",     icon: "👻", trophyRange: "4000〜5999" },
+  { id: "champion",    label: "チャンピオン",  icon: "👑", trophyRange: "6000〜7999" },
+  { id: "grandmaster", label: "グランドマスター", icon: "⚡", trophyRange: "8000〜9999" },
+  { id: "top-ladder",  label: "トップラダー",  icon: "🏆", trophyRange: "10000〜14999" },
+  { id: "ultimate",    label: "アルティメット", icon: "💎", trophyRange: "15000+" },
+];
 
 export default function HomePage() {
   const [tag, setTag] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [animStyle, setAnimStyle] = useState<"cyber" | "pop">("pop");
+  const [selectedArena, setSelectedArena] = useState("champion");
   const router = useRouter();
 
   useEffect(() => {
@@ -234,42 +251,81 @@ export default function HomePage() {
           </form>
         </motion.div>
 
-        {/* トレンドデッキ (Trending Decks) - Stitch提案の要素 */}
+        {/* トレンドデッキ */}
         <motion.div
           className="w-full mt-2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.6 }}
         >
-          <div className="flex justify-between items-end mb-3 px-2">
-            <h3 className="text-[var(--text-main)] font-extrabold text-lg tracking-wide">Trending Decks</h3>
-            <button onClick={() => router.push('/arena')} className="text-blue-500 hover:text-blue-400 text-xs font-bold transition-colors">
-              View All
+          <div className="flex justify-between items-end mb-3 px-1">
+            <h3 className="text-[var(--text-main)] font-extrabold text-lg tracking-wide">Meta Trends</h3>
+            <button
+              onClick={() => router.push(`/arena?id=${selectedArena}`)}
+              className="flex items-center gap-1 text-blue-500 hover:text-blue-400 text-xs font-bold transition-colors"
+            >
+              View All <ChevronRight className="w-3 h-3" />
             </button>
           </div>
+
+          {/* アリーナ帯ピル選択 */}
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-3" style={{ scrollbarWidth: "none" }}>
+            {QUICK_ARENAS.map((arena) => (
+              <button
+                key={arena.id}
+                onClick={() => setSelectedArena(arena.id)}
+                className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap"
+                style={
+                  selectedArena === arena.id
+                    ? {
+                        background: animStyle === "pop"
+                          ? "rgba(59,130,246,0.15)"
+                          : "linear-gradient(135deg,rgba(124,58,237,0.4),rgba(13,204,242,0.4))",
+                        border: animStyle === "pop"
+                          ? "1px solid rgba(59,130,246,0.5)"
+                          : "1px solid rgba(13,204,242,0.5)",
+                        color: animStyle === "pop" ? "#3b82f6" : "#fff",
+                      }
+                    : {
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid var(--glass-border)",
+                        color: "var(--text-muted)",
+                      }
+                }
+              >
+                <span>{arena.icon}</span>
+                {arena.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 選択中アリーナのトロフィー帯表示 */}
+          <p className="text-[var(--text-muted)] text-[11px] text-center mb-3 font-medium">
+            {QUICK_ARENAS.find(a => a.id === selectedArena)?.trophyRange} トロフィー帯のメタデータ
+          </p>
+
+          {/* メタ閲覧カード */}
           <div className="grid grid-cols-2 gap-3 pb-4">
-            {/* Mock Trending Card 1 */}
             <div
-              onClick={() => router.push('/arena?view=decks')}
+              onClick={() => router.push(`/arena?id=${selectedArena}&view=decks`)}
               className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-3xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer hover:-translate-y-1 relative overflow-hidden group"
               style={{ background: animStyle === "pop" ? "#ffffff" : "var(--glass-bg)" }}
             >
               <div className="bg-slate-800 w-full h-20 rounded-2xl flex items-center justify-center mb-3 overflow-hidden">
-                <img src="/Gemini_Generated_Image_87eqmd87eqmd87eq.png" alt="Mighty Miner" className="w-full h-full object-cover opacity-90 group-hover:scale-110 transition-transform duration-500" />
+                <img src="/Gemini_Generated_Image_87eqmd87eqmd87eq.png" alt="Meta Decks" className="w-full h-full object-cover opacity-90 group-hover:scale-110 transition-transform duration-500" />
               </div>
               <h4 className="font-extrabold text-[var(--text-main)] text-sm mb-1">デッキトレンド</h4>
               <p className="text-[var(--text-muted)] text-[10px] uppercase font-bold tracking-wider">Top Meta Decks</p>
               <div className="absolute bottom-0 left-0 h-1 bg-orange-500 w-full rounded-b-3xl"></div>
             </div>
 
-            {/* Mock Trending Card 2 */}
             <div
-              onClick={() => router.push('/arena?view=cards')}
+              onClick={() => router.push(`/arena?id=${selectedArena}&view=cards`)}
               className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-3xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer hover:-translate-y-1 relative overflow-hidden group"
               style={{ background: animStyle === "pop" ? "#ffffff" : "var(--glass-bg)" }}
             >
               <div className="bg-slate-800 w-full h-20 rounded-2xl flex items-center justify-center mb-3 overflow-hidden">
-                <img src="/Gemini_Generated_Image_bqgr0rbqgr0rbqgr.png" alt="Three Musketeers" className="w-full h-full object-cover opacity-90 group-hover:scale-110 transition-transform duration-500" />
+                <img src="/Gemini_Generated_Image_bqgr0rbqgr0rbqgr.png" alt="Card Usage" className="w-full h-full object-cover opacity-90 group-hover:scale-110 transition-transform duration-500" />
               </div>
               <h4 className="font-extrabold text-[var(--text-main)] text-sm mb-1">カード使用率</h4>
               <p className="text-[var(--text-muted)] text-[10px] uppercase font-bold tracking-wider">Card Ranking</p>
@@ -278,15 +334,30 @@ export default function HomePage() {
           </div>
         </motion.div>
 
-        {/* フッター */}
-        <motion.p
-          className="text-[var(--text-muted)] text-xs text-center font-medium opacity-80"
+        {/* フッター + バージョンバッジ */}
+        <motion.div
+          className="flex flex-col items-center gap-1.5"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
         >
-          Clash Royale API で安全に取得 · RoyaleAPI とは一線を画す個人最適化
-        </motion.p>
+          <p className="text-[var(--text-muted)] text-xs text-center font-medium opacity-80">
+            Clash Royale API で安全に取得 · RoyaleAPI とは一線を画す個人最適化
+          </p>
+          {/* バージョンバッジ */}
+          <span
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono opacity-60 hover:opacity-100 transition-opacity"
+            style={{
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
+              color: "var(--text-muted)",
+            }}
+            title={`Build: ${BUILD_DATE}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse" />
+            v{APP_VERSION} · #{COMMIT_SHA}
+          </span>
+        </motion.div>
       </div>
     </main>
   );
