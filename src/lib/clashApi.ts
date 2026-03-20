@@ -67,7 +67,8 @@ export interface BattleCard {
 export interface BattleTeam {
     tag: string;
     name: string;
-    crownsEarned: number;
+    crowns: number;           // API実フィールド名（旧 crownsEarned は存在しない）
+    crownsEarned?: number;    // 後方互換（古いキャッシュ用）
     cards: BattleCard[];
 }
 

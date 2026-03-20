@@ -72,7 +72,7 @@ export async function saveBattleLog(
         const opponent = battle.opponent?.[0];
         if (!team?.cards || !opponent?.cards) continue;
 
-        const isWin = (team.crownsEarned ?? 0) > (opponent.crownsEarned ?? 0);
+        const isWin = (team.crowns ?? team.crownsEarned ?? 0) > (opponent.crowns ?? opponent.crownsEarned ?? 0);
         const deckCards = team.cards.map(c => c.name);
         const deckKey = generateDeckKey(deckCards);
 
@@ -97,11 +97,14 @@ export async function saveBattleLog(
     let newPlayers = 0;
 
     try {
-        // バトルレコード保存（バッチ挿入）
+        // バトルレコード保存（バッチ挿入 - 重複はスキップ）
         if (battleRecords.length > 0) {
             const { error } = await supabase
                 .from("raw_battles")
-                .insert(battleRecords);
+                .upsert(battleRecords, {
+                    onConflict: "player_tag,battle_time,deck_key",
+                    ignoreDuplicates: true,
+                });
 
             if (!error) {
                 saved = battleRecords.length;

@@ -79,7 +79,7 @@ export function analyzeLocalMeta(battles: Battle[]): { cardName: string; count: 
 export function analyzeLossMeta(battles: Battle[]): Record<string, number> {
     const counter: Record<string, number> = {};
     const losses = battles.filter(
-        b => (b.team?.[0]?.crownsEarned ?? 0) < (b.opponent?.[0]?.crownsEarned ?? 0)
+        b => (b.team?.[0]?.crowns ?? b.team?.[0]?.crownsEarned ?? 0) < (b.opponent?.[0]?.crowns ?? b.opponent?.[0]?.crownsEarned ?? 0)
     );
     for (const battle of losses.slice(0, 15)) {
         const opponent = battle.opponent?.[0];
