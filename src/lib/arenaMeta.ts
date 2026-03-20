@@ -427,8 +427,8 @@ export async function fetchArenaMetaFromDB(trophiesOrArenaInput: number | string
 
     try {
         const { data, error } = await supabase
-            .from('arena_meta_stats')
-            .select('top_decks, total_analyzed_battles')
+            .from('arena_meta_aggregated')
+            .select('top_decks, total_battles_analyzed')
             .eq('arena_id', categoryId)
             .single();
 

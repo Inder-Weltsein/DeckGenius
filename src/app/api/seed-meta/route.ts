@@ -23,18 +23,18 @@ export async function POST() {
 
     try {
         const seedData = [
-            { arena_id: "beginner", top_decks: BEGINNER_DECKS, total_analyzed_battles: 25000 },
-            { arena_id: "challenger", top_decks: CHALLENGER_DECKS, total_analyzed_battles: 25000 },
-            { arena_id: "master", top_decks: MASTER_DECKS, total_analyzed_battles: 25000 },
-            { arena_id: "champion", top_decks: CHAMPION_DECKS, total_analyzed_battles: 25000 },
-            { arena_id: "grandmaster", top_decks: GRANDMASTER_DECKS, total_analyzed_battles: 25000 },
-            { arena_id: "top-ladder", top_decks: TOP_LADDER_DECKS, total_analyzed_battles: 25000 },
-            { arena_id: "ultimate", top_decks: ULTIMATE_DECKS, total_analyzed_battles: 25000 },
+            { arena_id: "beginner", top_decks: BEGINNER_DECKS, total_battles_analyzed: 25000, data_source: "static" },
+            { arena_id: "challenger", top_decks: CHALLENGER_DECKS, total_battles_analyzed: 25000, data_source: "static" },
+            { arena_id: "master", top_decks: MASTER_DECKS, total_battles_analyzed: 25000, data_source: "static" },
+            { arena_id: "champion", top_decks: CHAMPION_DECKS, total_battles_analyzed: 25000, data_source: "static" },
+            { arena_id: "grandmaster", top_decks: GRANDMASTER_DECKS, total_battles_analyzed: 25000, data_source: "static" },
+            { arena_id: "top-ladder", top_decks: TOP_LADDER_DECKS, total_battles_analyzed: 25000, data_source: "static" },
+            { arena_id: "ultimate", top_decks: ULTIMATE_DECKS, total_battles_analyzed: 25000, data_source: "static" },
         ];
 
         for (const data of seedData) {
             const { error } = await supabaseAdmin
-                .from('arena_meta_stats')
+                .from('arena_meta_aggregated')
                 .upsert(data, { onConflict: 'arena_id' });
 
             if (error) {

@@ -145,11 +145,52 @@ export async function GET(req: NextRequest) {
             }
 
             // arena_meta_aggregated を更新
-            const topDecks = upsertRecords
+            const topScores = upsertRecords
                 .sort((a, b) => b.composite_score - a.composite_score)
                 .slice(0, 20);
 
             const quality = getSampleQuality(battles7d.length);
+
+            // raw_battles から上位デッキのカードリストを一括取得
+            const topDeckKeys = topScores.map(d => d.deck_key);
+            const { data: deckSamples } = await supabase
+                .from("raw_battles")
+                .select("deck_key, deck_cards")
+                .in("deck_key", topDeckKeys)
+                .eq("arena_id", arenaId)
+                .limit(topDeckKeys.length * 3);
+
+            const deckCardsMap = new Map<string, string[]>();
+            if (deckSamples) {
+                for (const sample of deckSamples) {
+                    if (!deckCardsMap.has(sample.deck_key)) {
+                        deckCardsMap.set(sample.deck_key, sample.deck_cards);
+                    }
+                }
+            }
+
+            // ArenaDeckStats 形式に変換してフロントエンドが直接利用できる形で保存
+            const topDecks = topScores.map(d => {
+                const cards: string[] = deckCardsMap.get(d.deck_key) ??
+                    d.deck_key.split("_").map((c: string) =>
+                        c.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+                    );
+                const trend: "up" | "down" | "stable" =
+                    d.wr_delta > 0.02 ? "up" : d.wr_delta < -0.02 ? "down" : "stable";
+                const useRate = totalBattles7d > 0
+                    ? Math.round((deckMap.get(d.deck_key)?.total_7d ?? 0) / totalBattles7d * 1000) / 10
+                    : 0;
+                return {
+                    deckId: d.deck_key,
+                    deckName: cards.slice(0, 2).join(" + "),
+                    archetype: "real",
+                    cards,
+                    winRate: Math.round(d.wilson_wr * 1000) / 10,
+                    useRate,
+                    avgElixir: 0,
+                    trend,
+                };
+            });
 
             await supabase
                 .from("arena_meta_aggregated")
@@ -166,10 +207,46 @@ export async function GET(req: NextRequest) {
         }
 
         const elapsed = Date.now() - startTime;
+
+        // ─────────────────────────────────────────────────────────────
+        // Vercel Hobby プランの Cron 制限（2枠）回避：
+        // aggregate-trends 完了直後に update-embeddings を連鎖実行する。
+        // Cron スロットを消費せずに「収集→集計→ベクトル化」を1本化する。
+        // ─────────────────────────────────────────────────────────────
+        let embeddingResult: { processed?: number; message?: string } = {};
+        try {
+            // リクエストの host ヘッダーからベースURLを動的に構築
+            // ローカル: http://localhost:3001  Vercel: https://xxx.vercel.app
+            const host = req.headers.get("host") ?? "localhost:3000";
+            const proto = host.startsWith("localhost") ? "http" : "https";
+            const baseUrl = process.env.VERCEL_URL
+                ? `https://${process.env.VERCEL_URL}`
+                : `${proto}://${host}`;
+
+            const embResp = await fetch(`${baseUrl}/api/cron/update-embeddings`, {
+                headers: {
+                    authorization: process.env.CRON_SECRET
+                        ? `Bearer ${process.env.CRON_SECRET}`
+                        : "",
+                },
+            });
+
+            if (embResp.ok) {
+                embeddingResult = await embResp.json();
+                console.log("[aggregate-trends] update-embeddings 連鎖完了:", embeddingResult.message);
+            } else {
+                console.warn("[aggregate-trends] update-embeddings 連鎖失敗:", embResp.status);
+            }
+        } catch (embErr) {
+            // 連鎖失敗でもメイン処理の成功レスポンスは返す
+            console.warn("[aggregate-trends] update-embeddings 連鎖エラー（無視）:", embErr);
+        }
+
         return NextResponse.json({
             status: "success",
             elapsed_ms: elapsed,
             results,
+            embeddings: embeddingResult,
         });
     } catch (err) {
         console.error("[aggregate-trends] エラー:", err);
