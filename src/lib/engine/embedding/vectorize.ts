@@ -24,13 +24,13 @@ export async function deckToVector(cardNames: string[]): Promise<number[]> {
     const result = await model.embedContent({
       content: { parts: [{ text }], role: 'user' },
       taskType: TaskType.CLUSTERING,
-      // @ts-ignore: outputDimensionality is supported by the API but missing in current SDK types
+      // @ts-expect-error: outputDimensionality is supported by the API but missing in current SDK types
       outputDimensionality: 768, // Supabase拡張のvector(768)に合わせる
     });
     
     return result.embedding.values;
-  } catch (err: any) {
-    console.error("[vectorize] Gemini API Error:", err.message);
+  } catch (err: unknown) {
+    console.error("[vectorize] Gemini API Error:", (err as Error).message);
     throw err;
   }
 }

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // ユーティリティスクリプト（CommonJS形式のため除外）
+    "check_db.js",
+    "scripts/**",
   ]),
 ]);
 

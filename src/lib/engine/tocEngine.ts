@@ -157,9 +157,9 @@ async function calcMetaScore(
             sampleCount = data.sample_count ?? 0;
             // 既知のデッキはmetaDeck.archetypeが存在するため、動的IDはnullにする
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         // PGRST116 (No rows found) の場合は未登録（新興デッキ）とみなす
-        if (err.code === "PGRST116") {
+        if ((err as { code?: string }).code === "PGRST116") {
             try {
                 // 1. 新興デッキのAIベクトル化
                 const queryVector = await deckToVector(metaDeck.cards);

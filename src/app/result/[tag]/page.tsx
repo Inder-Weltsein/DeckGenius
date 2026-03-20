@@ -94,7 +94,7 @@ export default function ResultPage() {
     const currentDeck = activeDeck!;
 
     // TOC ScoreBreakdown バー用
-    const currentBreakdown = activeTab === 0 ? scoreBreakdown : (activeDeck as any)?.scoreBreakdown;
+    const currentBreakdown = activeTab === 0 ? scoreBreakdown : activeDeck?.scoreBreakdown;
     const breakdownBars = currentBreakdown ? [
         { label: "カードレベル（育成度）", value: currentBreakdown.growthScore,   color: "cyan-purple" as const },
         { label: "現環境への適応力",       value: currentBreakdown.metaScore,     color: "green" as const },
@@ -321,7 +321,7 @@ export default function ResultPage() {
                 )}
 
                 {/* デッキ修正提案 (TOC Deck Checker) */}
-                {(currentDeck as any)?.deckSuggestions?.length > 0 && (
+                {currentDeck?.deckSuggestions?.length > 0 && (
                     <motion.div
                         className="glass-card p-4"
                         style={{ borderColor: "rgba(249,115,22,0.25)" }}
@@ -334,7 +334,7 @@ export default function ResultPage() {
                             <span className="text-xs font-semibold text-orange-400 uppercase tracking-widest">デッキ・コンストラクト・チェッカー</span>
                         </div>
                         <div className="flex flex-col gap-2">
-                            {((currentDeck as any).deckSuggestions as string[]).map((suggestion, i) => (
+                            {currentDeck.deckSuggestions.map((suggestion, i) => (
                                 <p key={i} className="text-sm text-gray-300 leading-relaxed">{suggestion}</p>
                             ))}
                         </div>

@@ -57,7 +57,7 @@ export async function saveBattleLog(
     const arenaCategory = getArenaCategoryId(trophies);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const battleRecords: any[] = [];
+    const battleRecords: Record<string, unknown>[] = [];
     const newPlayerTags = new Set<string>();
 
     for (const battle of battles) {

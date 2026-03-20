@@ -84,8 +84,8 @@ export async function GET(request: Request) {
                     await new Promise(r => setTimeout(r, 1000));
                 }
 
-            } catch (err: any) {
-                console.error(`[update-embeddings] Gemini生成失敗: ${deckKey}:`, err.message);
+            } catch (err: unknown) {
+                console.error(`[update-embeddings] Gemini生成失敗: ${deckKey}:`, (err as Error).message);
                 failCount++;
             }
         }
@@ -96,8 +96,8 @@ export async function GET(request: Request) {
             processed: successCount
         });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("[update-embeddings] 全体エラー:", err);
-        return NextResponse.json({ status: "error", message: err.message }, { status: 500 });
+        return NextResponse.json({ status: "error", message: (err as Error).message }, { status: 500 });
     }
 }

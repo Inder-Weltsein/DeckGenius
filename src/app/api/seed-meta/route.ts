@@ -44,8 +44,8 @@ export async function POST() {
         }
 
         return NextResponse.json({ success: true, message: "Supabase database seeded successfully!" });
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Caught error in seed API:", e);
-        return NextResponse.json({ error: e.message }, { status: 500 });
+        return NextResponse.json({ error: (e as Error).message }, { status: 500 });
     }
 }
