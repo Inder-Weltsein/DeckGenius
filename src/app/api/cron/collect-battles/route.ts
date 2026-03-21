@@ -1,9 +1,10 @@
 /**
  * /api/cron/collect-battles — BFS収集Cron
  *
- * 設計書 v1.0 §2 に準拠
- * player_pool から未訪問プレイヤーを取り出し、
- * バトルログを取得してDBに保存する。
+ * 設計書 v1.2 Sprint 2 に準拠
+ * 1. visitedリセット: 7日以上前に訪問済みのプレイヤーを再訪問対象にする
+ * 2. 3層シード: キューが枯渇しそうなら Top200 から自動補充
+ * 3. BFS本体: player_pool から未訪問プレイヤーを処理
  *
  * ゲート2: アリーナ帯キャップ — 各arenaの記録数が閾値未満の場合のみ収集
  * Vercel制限: 最大60秒/実行
@@ -24,23 +25,106 @@ const API_TOKEN = process.env.CLASH_API_TOKEN;
 // 設定
 const MAX_PLAYERS_PER_RUN = 10; // 60秒制限を考慮
 const ARENA_CAP = 1000; // ゲート2: アリーナ帯あたりの最大バトル数
+const RESEED_THRESHOLD = 50; // 未訪問プレイヤーがこの数を下回ったらシード再投入
+const REVISIT_DAYS = 7; // この日数を超えたプレイヤーを再訪問対象にする
+
+// 3層シード用ロケーションID（Clash Royale API）
+const SEED_LOCATIONS = [
+    { id: "global", name: "グローバル" },
+    { id: "57000114", name: "日本" },
+];
+
+/**
+ * API呼び出し（指数バックオフ + 429ハンドリング付き）
+ */
+async function fetchWithRetry(url: string, maxRetries = 3): Promise<Response> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${API_TOKEN}` },
+        });
+
+        if (res.status === 429) {
+            if (attempt === maxRetries) throw new Error("429 Too Many Requests: リトライ上限");
+            const retryAfter = parseInt(res.headers.get("retry-after") || "2", 10);
+            const delay = Math.max(retryAfter * 1000, 1000 * Math.pow(2, attempt));
+            console.warn(`[collect-battles] 429, ${delay}ms後にリトライ (${attempt + 1}/${maxRetries})`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+        }
+
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        return res;
+    }
+    throw new Error("リトライ上限到達");
+}
 
 async function fetchBattleLog(tag: string) {
     const encodedTag = encodeURIComponent(tag.startsWith("#") ? tag : `#${tag}`);
-    const res = await fetch(`${API_BASE}/players/${encodedTag}/battlelog`, {
-        headers: { Authorization: `Bearer ${API_TOKEN}` },
-    });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const res = await fetchWithRetry(`${API_BASE}/players/${encodedTag}/battlelog`);
     return res.json();
 }
 
 async function fetchPlayer(tag: string) {
     const encodedTag = encodeURIComponent(tag.startsWith("#") ? tag : `#${tag}`);
-    const res = await fetch(`${API_BASE}/players/${encodedTag}`, {
-        headers: { Authorization: `Bearer ${API_TOKEN}` },
-    });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const res = await fetchWithRetry(`${API_BASE}/players/${encodedTag}`);
     return res.json();
+}
+
+/**
+ * 3層シード: グローバル/国別 Top200 からプレイヤーを player_pool に投入
+ */
+async function reseedFromLeaderboard(): Promise<number> {
+    let seeded = 0;
+
+    for (const loc of SEED_LOCATIONS) {
+        try {
+            const url = loc.id === "global"
+                ? `${API_BASE}/locations/global/rankings/players?limit=200`
+                : `${API_BASE}/locations/${loc.id}/rankings/players?limit=200`;
+            const res = await fetchWithRetry(url);
+            const data = await res.json();
+            const players = data.items ?? [];
+
+            const records = players.map((p: { tag: string; trophies?: number }) => ({
+                player_tag: p.tag,
+                current_trophies: p.trophies ?? 0,
+                visited: false,
+                source: `seed_${loc.id}`,
+            }));
+
+            if (records.length > 0) {
+                const { error } = await supabase
+                    .from("player_pool")
+                    .upsert(records, { onConflict: "player_tag", ignoreDuplicates: true });
+                if (!error) seeded += records.length;
+            }
+
+            console.log(`[reseed] ${loc.name}: ${records.length}名投入`);
+        } catch (err) {
+            console.error(`[reseed] ${loc.name}取得失敗:`, err);
+        }
+    }
+
+    return seeded;
+}
+
+/**
+ * visitedリセット: REVISIT_DAYS 日以上前に訪問したプレイヤーを再訪問対象にする
+ */
+async function resetStaleVisited(): Promise<number> {
+    const cutoff = new Date(Date.now() - REVISIT_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+        .from("player_pool")
+        .update({ visited: false })
+        .eq("visited", true)
+        .lt("last_collected", cutoff)
+        .select("player_tag");
+
+    if (error) {
+        console.error("[resetStale] リセット失敗:", error.message);
+        return 0;
+    }
+    return data?.length ?? 0;
 }
 
 export async function GET(req: NextRequest) {
@@ -58,9 +142,24 @@ export async function GET(req: NextRequest) {
     let processed = 0;
     let totalSaved = 0;
     let totalNewPlayers = 0;
+    let resetCount = 0;
+    let seededCount = 0;
     const errors: string[] = [];
 
     try {
+        // === Step 0: visitedリセット（7日経過したプレイヤーを再訪問対象に） ===
+        resetCount = await resetStaleVisited();
+
+        // === Step 1: キュー枯渇チェック → 3層シード自動補充 ===
+        const { count: unvisitedCount } = await supabase
+            .from("player_pool")
+            .select("*", { count: "exact", head: true })
+            .eq("visited", false);
+
+        if ((unvisitedCount ?? 0) < RESEED_THRESHOLD) {
+            seededCount = await reseedFromLeaderboard();
+        }
+
         // ゲート2: アリーナ帯別のバトル数を確認
         const { data: arenaCounts } = await supabase
             .from("raw_battles")
@@ -74,7 +173,7 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        // 未訪問プレイヤーを取得（キャップに達していないアリーナのプレイヤー優先）
+        // === Step 2: BFS本体 ===
         const { data: queue } = await supabase
             .from("player_pool")
             .select("player_tag, arena_id")
@@ -85,6 +184,8 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({
                 status: "no_queue",
                 message: "未訪問プレイヤーなし",
+                reset_count: resetCount,
+                seeded_count: seededCount,
                 elapsed_ms: Date.now() - startTime,
             });
         }
@@ -147,6 +248,8 @@ export async function GET(req: NextRequest) {
             processed,
             battles_saved: totalSaved,
             new_players_discovered: totalNewPlayers,
+            reset_count: resetCount,
+            seeded_count: seededCount,
             errors: errors.length > 0 ? errors : undefined,
             elapsed_ms: Date.now() - startTime,
         });

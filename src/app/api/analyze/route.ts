@@ -4,6 +4,7 @@ import { getPlayer, getBattleLog } from "@/lib/clashApi";
 import { analyze } from "@/lib/analyzer";
 import { getArenaByTrophies, fetchArenaMetaFromDB } from "@/lib/arenaMeta";
 import { saveBattleLog } from "@/lib/engine/battleCollector";
+import { createClient } from "@supabase/supabase-js";
 
 // APIトークンが有効かチェック
 function isValidToken(token: string | undefined): boolean {
@@ -54,7 +55,39 @@ async function fetchAndAnalyze(tag: string) {
             console.warn("[BFS] バトルログ保存エラー:", err);
         });
 
-    return await analyze(player.name, player.trophies, player.cards, battles, player.arena);
+    const result = await analyze(player.name, player.trophies, player.cards, battles, player.arena);
+
+    // Phase2 観測ログ: 推薦結果を recommend_logs に非同期保存
+    saveRecommendLog(player.tag ?? tag, player.trophies, result).catch(err => {
+        console.warn("[recommend_log] 保存エラー:", err);
+    });
+
+    return result;
+}
+
+/**
+ * Phase2 観測ログ: 推薦デッキと文脈を recommend_logs に記録
+ * テーブルが存在しなくても静かに失敗する（Phase2 DDL実行前でもクラッシュしない）
+ */
+async function saveRecommendLog(
+    playerTag: string,
+    trophies: number,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    result: any
+) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseKey) return;
+
+    const svc = createClient(supabaseUrl, supabaseKey);
+    await svc.from("recommend_logs").insert({
+        player_tag: playerTag,
+        trophies,
+        recommended_deck: result.recommendedDeck?.meta?.id ?? "unknown",
+        compatibility_score: result.recommendedDeck?.compatibilityScore ?? 0,
+        alternative_count: result.alternativeDecks?.length ?? 0,
+        is_demo: false,
+    });
 }
 
 export async function GET(req: NextRequest) {
