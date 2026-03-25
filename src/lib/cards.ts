@@ -195,7 +195,7 @@ export const ALL_CARDS: CardDefinition[] = [
     { name: "Freeze", nameJa: "フリーズ", type: "spell", rarity: "epic", elixir: 4, tags: ["spell"] },
     { name: "Snowball", nameJa: "スノーボール", type: "spell", rarity: "common", elixir: 2, tags: ["spell", "cycle"] },
     { name: "Earthquake", nameJa: "アースクエイク", type: "spell", rarity: "rare", elixir: 3, tags: ["spell"] },
-    { name: "Barbarian Barrel", nameJa: "バーバリアンの小屋", type: "spell", rarity: "epic", elixir: 2, tags: ["spell", "cycle"] },
+    { name: "Barbarian Barrel", nameJa: "バーバリアンバレル", type: "spell", rarity: "epic", elixir: 2, tags: ["spell", "cycle"] },
     { name: "Royal Delivery", nameJa: "ロイヤルデリバリー", type: "spell", rarity: "common", elixir: 3, tags: ["spell", "splash"] },
 
     // --- 建物 ---
@@ -215,10 +215,19 @@ export const ALL_CARDS: CardDefinition[] = [
     // --- 新カード等追加 ---
     { name: "Void", nameJa: "ヴォイド", type: "spell", rarity: "epic", elixir: 3, tags: ["spell", "tank_killer"] },
     { name: "Goblin Curse", nameJa: "ゴブリンの呪い", type: "spell", rarity: "epic", elixir: 2, tags: ["spell", "splash"] },
-    { name: "Vines", nameJa: "ゴブリンの呪い", type: "spell", rarity: "epic", elixir: 2, tags: ["spell", "splash"] },
+    { name: "Vines", nameJa: "バインズ", type: "spell", rarity: "epic", elixir: 2, tags: ["spell", "splash"] },
     { name: "Suspicious Bush", nameJa: "あやしいブッシュ", type: "troop", rarity: "rare", elixir: 2, tags: ["win_condition", "cycle"] },
     { name: "Goblin Demolisher", nameJa: "ゴブリンデモリッシャー", type: "troop", rarity: "rare", elixir: 4, tags: ["splash", "tank_killer"] },
     { name: "Goblin Machine", nameJa: "ゴブリンマシン", type: "troop", rarity: "legendary", elixir: 5, tags: ["tank", "splash"] },
     { name: "Goblinstein", nameJa: "ゴブリンシュタイン", type: "troop", rarity: "champion", elixir: 5, tags: ["tank", "anti_air"] },
     { name: "Boss Bandit", nameJa: "ボスバンディット", type: "troop", rarity: "champion", elixir: 3, tags: ["win_condition", "bridge_spam", "cycle"] },
+
+    // --- スクリーンショットで確認された未登録カード ---
+    { name: "Barbarians", nameJa: "バーバリアン", type: "troop", rarity: "common", elixir: 5, tags: ["tank", "splash"] },
+    { name: "Giant Snowball", nameJa: "ジャイアントスノーボール", type: "spell", rarity: "common", elixir: 2, tags: ["spell", "cycle"] },
+    { name: "Skeleton Barrel", nameJa: "スケルトンバレル", type: "troop", rarity: "common", elixir: 3, tags: ["win_condition", "cycle"] },
+    { name: "Electro Giant", nameJa: "エレクトロジャイアント", type: "troop", rarity: "epic", elixir: 7, tags: ["win_condition", "tank"] },
+    { name: "Mirror", nameJa: "ミラー", type: "spell", rarity: "epic", elixir: 1, tags: ["spell", "cycle"] },
+    { name: "Clone", nameJa: "クローン", type: "spell", rarity: "epic", elixir: 3, tags: ["spell"] },
+    { name: "Rascals", nameJa: "悪ガキ軍団", type: "troop", rarity: "common", elixir: 5, tags: ["swarm", "anti_air"] },
 ];

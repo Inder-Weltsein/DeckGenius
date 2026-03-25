@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { wilsonWinRate, calcWrDelta, calcVelocity, calcCompositeScore, getSampleQuality } from "@/lib/engine/wilsonStats";
+import { getCardDef } from "@/lib/cards";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -182,6 +183,13 @@ export async function GET(req: NextRequest) {
                 const useRate = totalBattles7d > 0
                     ? Math.round((deckMap.get(d.deck_key)?.total_7d ?? 0) / totalBattles7d * 1000) / 10
                     : 0;
+                const elixirVals = cards
+                    .map((c: string) => getCardDef(c)?.elixir ?? 0)
+                    .filter((e: number) => e > 0);
+                const avgElixir = elixirVals.length > 0
+                    ? Math.round(elixirVals.reduce((a: number, b: number) => a + b, 0) / elixirVals.length * 10) / 10
+                    : 0;
+
                 return {
                     deckId: d.deck_key,
                     deckName: cards.slice(0, 2).join(" + "),
@@ -189,7 +197,7 @@ export async function GET(req: NextRequest) {
                     cards,
                     winRate: Math.round(d.wilson_wr * 1000) / 10,
                     useRate,
-                    avgElixir: 0,
+                    avgElixir,
                     trend,
                 };
             });
