@@ -1,41 +1,38 @@
 /**
  * /api/cron/collect-battles — BFS収集Cron
  *
- * 設計書 v1.2 Sprint 2 に準拠
- * 1. visitedリセット: 7日以上前に訪問済みのプレイヤーを再訪問対象にする
- * 2. 3層シード: キューが枯渇しそうなら Top200 から自動補充
- * 3. BFS本体: player_pool から未訪問プレイヤーを処理
- *
- * ゲート2: アリーナ帯キャップ — 各arenaの記録数が閾値未満の場合のみ収集
- * Vercel制限: 最大60秒/実行
+ * 実装計画書 v2.0 Sprint 0 + Sprint 1 対応:
+ *   F-2: arena_id を visited 時に正規化
+ *   Sprint1: reseedMiddle() でクラン検索から中帯プレイヤーを補充
+ *   PoL: グローバルランキングを pathOfLegend エンドポイントに変更
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { saveBattleLog } from "@/lib/engine/battleCollector";
+import { saveBattleLog, getArenaCategoryId } from "@/lib/engine/battleCollector";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// APIトークン
 const API_BASE = process.env.CLASH_API_BASE || "https://api.clashroyale.com/v1";
 const API_TOKEN = process.env.CLASH_API_TOKEN;
 
 // 設定
-const MAX_PLAYERS_PER_RUN = 10; // 60秒制限を考慮
-const ARENA_CAP = 1000; // ゲート2: アリーナ帯あたりの最大バトル数
-const RESEED_THRESHOLD = 50; // 未訪問プレイヤーがこの数を下回ったらシード再投入
-const REVISIT_DAYS = 7; // この日数を超えたプレイヤーを再訪問対象にする
+const MAX_PLAYERS_PER_RUN = 10;
+const ARENA_CAP = 1000;           // アリーナ帯あたりの最大バトル数（7日間）
+const RESEED_THRESHOLD = 50;      // 未訪問プレイヤーがこの数以下でシード補充
+const MIDDLE_RESEED_THRESHOLD = 30; // 中帯プレイヤーがこの数以下でクランシード補充
+const REVISIT_DAYS = 7;
 
-// 3層シード用ロケーションID（Clash Royale API）
-const SEED_LOCATIONS = [
-    { id: "global", name: "グローバル" },
-    { id: "57000114", name: "日本" },
+// Top帯シード（PoLランキング）
+const TOP_SEED_LOCATIONS = [
+    { id: "global",    name: "グローバル", endpoint: "pathoflegend" },
+    { id: "57000114",  name: "日本",       endpoint: "pathoflegend" },
 ];
 
 /**
- * API呼び出し（指数バックオフ + 429ハンドリング付き）
+ * API呼び出し（指数バックオフ + 429ハンドリング）
  */
 async function fetchWithRetry(url: string, maxRetries = 3): Promise<Response> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -71,16 +68,17 @@ async function fetchPlayer(tag: string) {
 }
 
 /**
- * 3層シード: グローバル/国別 Top200 からプレイヤーを player_pool に投入
+ * Top帯シード: PoLランキングから player_pool に投入
  */
 async function reseedFromLeaderboard(): Promise<number> {
     let seeded = 0;
 
-    for (const loc of SEED_LOCATIONS) {
+    for (const loc of TOP_SEED_LOCATIONS) {
         try {
             const url = loc.id === "global"
-                ? `${API_BASE}/locations/global/rankings/players?limit=200`
-                : `${API_BASE}/locations/${loc.id}/rankings/players?limit=200`;
+                ? `${API_BASE}/locations/global/pathoflegend/players?limit=200`
+                : `${API_BASE}/locations/${loc.id}/pathoflegend/players?limit=200`;
+
             const res = await fetchWithRetry(url);
             const data = await res.json();
             const players = data.items ?? [];
@@ -88,6 +86,7 @@ async function reseedFromLeaderboard(): Promise<number> {
             const records = players.map((p: { tag: string; trophies?: number }) => ({
                 player_tag: p.tag,
                 current_trophies: p.trophies ?? 0,
+                arena_id: getArenaCategoryId(p.trophies ?? 0),
                 visited: false,
                 source: `seed_${loc.id}`,
             }));
@@ -99,9 +98,9 @@ async function reseedFromLeaderboard(): Promise<number> {
                 if (!error) seeded += records.length;
             }
 
-            console.log(`[reseed] ${loc.name}: ${records.length}名投入`);
+            console.log(`[reseed-top] ${loc.name}: ${records.length}名投入`);
         } catch (err) {
-            console.error(`[reseed] ${loc.name}取得失敗:`, err);
+            console.error(`[reseed-top] ${loc.name}取得失敗:`, err);
         }
     }
 
@@ -109,7 +108,59 @@ async function reseedFromLeaderboard(): Promise<number> {
 }
 
 /**
- * visitedリセット: REVISIT_DAYS 日以上前に訪問したプレイヤーを再訪問対象にする
+ * 中帯シード: クラン検索から champion/master 帯プレイヤーを補充
+ * トロフィー 5,000〜9,000 のプレイヤーを対象
+ */
+async function reseedMiddle(): Promise<number> {
+    let seeded = 0;
+
+    try {
+        // クランスコア100,000前後 = 平均6,000〜8,000杯クラン
+        const url = `${API_BASE}/clans?minScore=80000&limit=20`;
+        const res = await fetchWithRetry(url);
+        const data = await res.json();
+        const clans: { tag: string; name: string }[] = data.items ?? [];
+
+        for (const clan of clans.slice(0, 5)) {
+            try {
+                const membersRes = await fetchWithRetry(
+                    `${API_BASE}/clans/${encodeURIComponent(clan.tag)}/members`
+                );
+                const membersData = await membersRes.json();
+                const members: { tag: string; trophies: number }[] = membersData.items ?? [];
+
+                const midPlayers = members
+                    .filter(m => m.trophies >= 5000 && m.trophies < 9000)
+                    .map(m => ({
+                        player_tag: m.tag,
+                        current_trophies: m.trophies,
+                        arena_id: getArenaCategoryId(m.trophies),
+                        visited: false,
+                        source: "seed_middle_clan",
+                    }));
+
+                if (midPlayers.length > 0) {
+                    const { error } = await supabase
+                        .from("player_pool")
+                        .upsert(midPlayers, { onConflict: "player_tag", ignoreDuplicates: true });
+                    if (!error) seeded += midPlayers.length;
+                }
+
+                console.log(`[reseed-middle] ${clan.name}: ${midPlayers.length}名投入`);
+                await new Promise(r => setTimeout(r, 300));
+            } catch (err) {
+                console.error(`[reseed-middle] ${clan.tag}失敗:`, err);
+            }
+        }
+    } catch (err) {
+        console.error("[reseed-middle] クラン検索失敗:", err);
+    }
+
+    return seeded;
+}
+
+/**
+ * visitedリセット: REVISIT_DAYS日以上前に訪問したプレイヤーを再訪問対象に
  */
 async function resetStaleVisited(): Promise<number> {
     const cutoff = new Date(Date.now() - REVISIT_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -128,7 +179,6 @@ async function resetStaleVisited(): Promise<number> {
 }
 
 export async function GET(req: NextRequest) {
-    // Cronセキュリティ
     const authHeader = req.headers.get("authorization");
     if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -143,24 +193,38 @@ export async function GET(req: NextRequest) {
     let totalSaved = 0;
     let totalNewPlayers = 0;
     let resetCount = 0;
-    let seededCount = 0;
+    let seededTop = 0;
+    let seededMiddle = 0;
     const errors: string[] = [];
 
     try {
-        // === Step 0: visitedリセット（7日経過したプレイヤーを再訪問対象に） ===
+        // === Step 0: visitedリセット ===
         resetCount = await resetStaleVisited();
 
-        // === Step 1: キュー枯渇チェック → 3層シード自動補充 ===
-        const { count: unvisitedCount } = await supabase
+        // === Step 1: キュー状態確認 ===
+        const { count: unvisitedTotal } = await supabase
             .from("player_pool")
             .select("*", { count: "exact", head: true })
             .eq("visited", false);
 
-        if ((unvisitedCount ?? 0) < RESEED_THRESHOLD) {
-            seededCount = await reseedFromLeaderboard();
+        // 中帯未訪問プレイヤー数
+        const { count: unvisitedMiddle } = await supabase
+            .from("player_pool")
+            .select("*", { count: "exact", head: true })
+            .eq("visited", false)
+            .in("arena_id", ["champion", "master"]);
+
+        // Top帯シード補充
+        if ((unvisitedTotal ?? 0) < RESEED_THRESHOLD) {
+            seededTop = await reseedFromLeaderboard();
         }
 
-        // ゲート2: アリーナ帯別のバトル数を確認
+        // 中帯シード補充（champion/master が不足したら）
+        if ((unvisitedMiddle ?? 0) < MIDDLE_RESEED_THRESHOLD) {
+            seededMiddle = await reseedMiddle();
+        }
+
+        // === Step 2: ARENA_CAP チェック（F-2: 7日間バトル数） ===
         const { data: arenaCounts } = await supabase
             .from("raw_battles")
             .select("arena_id")
@@ -173,7 +237,7 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        // === Step 2: BFS本体 ===
+        // === Step 3: BFS本体 ===
         const { data: queue } = await supabase
             .from("player_pool")
             .select("player_tag, arena_id")
@@ -185,12 +249,13 @@ export async function GET(req: NextRequest) {
                 status: "no_queue",
                 message: "未訪問プレイヤーなし",
                 reset_count: resetCount,
-                seeded_count: seededCount,
+                seeded_top: seededTop,
+                seeded_middle: seededMiddle,
                 elapsed_ms: Date.now() - startTime,
             });
         }
 
-        // キャップに達していないアリーナのプレイヤーを優先
+        // ARENA_CAP未達のアリーナのプレイヤーを優先
         const candidates = queue.filter(p => {
             if (!p.arena_id) return true;
             return (arenaCountMap.get(p.arena_id) ?? 0) < ARENA_CAP;
@@ -199,30 +264,27 @@ export async function GET(req: NextRequest) {
         const toProcess = (candidates.length > 0 ? candidates : queue).slice(0, MAX_PLAYERS_PER_RUN);
 
         for (const player of toProcess) {
-            // 60秒タイムアウト防止
             if (Date.now() - startTime > 50000) break;
 
             try {
-                // プレイヤー情報取得（トロフィー確認）
                 const playerInfo = await fetchPlayer(player.player_tag);
                 const trophies = playerInfo.trophies ?? 0;
+                const arenaId = getArenaCategoryId(trophies);
 
-                // バトルログ取得
                 const battles = await fetchBattleLog(player.player_tag);
-
-                // DB保存
                 const { saved, newPlayers } = await saveBattleLog(
                     player.player_tag,
                     trophies,
                     battles
                 );
 
-                // 訪問済みマーク
+                // F-2: arena_id を正規化して更新
                 await supabase
                     .from("player_pool")
                     .update({
                         visited: true,
                         current_trophies: trophies,
+                        arena_id: arenaId,
                         last_collected: new Date().toISOString(),
                     })
                     .eq("player_tag", player.player_tag);
@@ -231,11 +293,9 @@ export async function GET(req: NextRequest) {
                 totalNewPlayers += newPlayers;
                 processed++;
 
-                // レート制限対策: 500ms間隔
                 await new Promise(r => setTimeout(r, 500));
             } catch (err) {
                 errors.push(`${player.player_tag}: ${String(err)}`);
-                // エラーでも訪問済みにする（無限リトライ防止）
                 await supabase
                     .from("player_pool")
                     .update({ visited: true })
@@ -249,7 +309,9 @@ export async function GET(req: NextRequest) {
             battles_saved: totalSaved,
             new_players_discovered: totalNewPlayers,
             reset_count: resetCount,
-            seeded_count: seededCount,
+            seeded_top: seededTop,
+            seeded_middle: seededMiddle,
+            arena_counts: Object.fromEntries(arenaCountMap),
             errors: errors.length > 0 ? errors : undefined,
             elapsed_ms: Date.now() - startTime,
         });

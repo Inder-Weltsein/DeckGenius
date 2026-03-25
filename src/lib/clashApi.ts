@@ -60,8 +60,8 @@ export interface BattleCard {
     id: number;
     level: number;
     maxLevel: number;
-    evolutionLevel?: number;
-    iconUrls: { medium: string; evolutionMedium?: string; };
+    evolutionLevel?: number;    // 0=通常 1=限界突破 2=ヒーロー
+    iconUrls: { medium: string; evolutionMedium?: string; heroMedium?: string; };
 }
 
 export interface BattleTeam {

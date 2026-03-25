@@ -17,7 +17,8 @@ export type CardTag =
     | "cycle"           // 低コスト回転要員
     | "building"        // 建物
     | "support"         // 後衛支援
-    | "swarm";          // 群れユニット
+    | "swarm"           // 群れユニット
+    | "bridge_spam";   // ブリッジスパム（橋前速攻）
 
 export interface CardDefinition {
     name: string;
@@ -218,5 +219,6 @@ export const ALL_CARDS: CardDefinition[] = [
     { name: "Suspicious Bush", nameJa: "あやしいブッシュ", type: "troop", rarity: "rare", elixir: 2, tags: ["win_condition", "cycle"] },
     { name: "Goblin Demolisher", nameJa: "ゴブリンデモリッシャー", type: "troop", rarity: "rare", elixir: 4, tags: ["splash", "tank_killer"] },
     { name: "Goblin Machine", nameJa: "ゴブリンマシン", type: "troop", rarity: "legendary", elixir: 5, tags: ["tank", "splash"] },
-    { name: "Goblinstein", nameJa: "ゴブリンシュタイン", type: "troop", rarity: "champion", elixir: 5, tags: ["tank", "anti_air"] }
+    { name: "Goblinstein", nameJa: "ゴブリンシュタイン", type: "troop", rarity: "champion", elixir: 5, tags: ["tank", "anti_air"] },
+    { name: "Boss Bandit", nameJa: "ボスバンディット", type: "troop", rarity: "champion", elixir: 3, tags: ["win_condition", "bridge_spam", "cycle"] },
 ];
