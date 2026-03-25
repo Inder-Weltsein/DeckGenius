@@ -15,6 +15,10 @@ import { getArenaTier, getTOCWeights, type ArenaTier } from "./arenaWeights";
 import { generateDeckKey } from "./deckKey";
 import { supabase } from "../supabaseClient";
 import { deckToVector } from "./embedding/vectorize";
+import { getArenaCategoryId } from "../engine/battleCollector";
+
+// sample_count が この閾値未満のデッキはメタスコアを信頼しない
+const MIN_SAMPLE_COUNT = 30;
 
 // ===== 型定義 =====
 
@@ -129,14 +133,16 @@ function calcGrowthScore(
 
 async function calcMetaScore(
     metaDeck: MetaDeck,
-    arenaId: string,
+    arenaId: string,   // "arena_19" 形式 (UI用)
+    trophies: number,  // トロフィー数 → DB用カテゴリに変換
     localMeta: { cardName: string; count: number }[],
     lossMeta: Record<string, number>,
     battleCount: number
 ): Promise<{ score: number; sampleCount: number; inferredArchetypeId?: number | null }> {
-    // DBからComposite Scoreを取得
+    // [2-4 C-1修正] arenaIdを"top-ladder"等のDBカテゴリに変換
+    const dbArenaId = getArenaCategoryId(trophies);
     const deckKey = generateDeckKey(metaDeck.cards);
-    let dbScore = 50; // 未登録デッキ = 中立50点（バイアスなし）
+    let dbScore = 50;
     let sampleCount = 0;
     let inferredArchetypeId: number | null = null;
 
@@ -144,7 +150,7 @@ async function calcMetaScore(
         const { data, error } = await supabase
             .from("trend_scores")
             .select("composite_score, sample_count")
-            .eq("arena_id", arenaId)
+            .eq("arena_id", dbArenaId)
             .eq("deck_key", deckKey)
             .single();
 
@@ -153,9 +159,13 @@ async function calcMetaScore(
         }
 
         if (data) {
-            dbScore = data.composite_score ?? 50;
             sampleCount = data.sample_count ?? 0;
-            // 既知のデッキはmetaDeck.archetypeが存在するため、動的IDはnullにする
+            // [2-1] sample_count < MIN_SAMPLE_COUNT は統計的に信頼不足 → 中立50点
+            if (sampleCount >= MIN_SAMPLE_COUNT) {
+                dbScore = data.composite_score ?? 50;
+            } else {
+                dbScore = 50;
+            }
         }
     } catch (err: unknown) {
         // PGRST116 (No rows found) の場合は未登録（新興デッキ）とみなす
@@ -166,10 +176,10 @@ async function calcMetaScore(
 
                 // 2. [並行処理] 近傍類似スコア予測 ＆ アーキタイプ推測
                 const [similarRes, archetypeRes] = await Promise.all([
-                    supabase.rpc("find_similar_decks", { 
-                        query_embedding: `[${queryVector.join(',')}]`, 
-                        target_arena_id: arenaId,
-                        match_count: 5 
+                    supabase.rpc("find_similar_decks", {
+                        query_embedding: `[${queryVector.join(',')}]`,
+                        target_arena_id: dbArenaId,  // [2-4] 正規化済みカテゴリを使用
+                        match_count: 5
                     }),
                     supabase.rpc("find_archetype", {
                         query_embedding: `[${queryVector.join(',')}]`,
@@ -334,7 +344,7 @@ export async function calcTOCScore(
 
     // Step 2: 4軸スコアリング
     const { score: growthScore, resolvedCards } = calcGrowthScore(metaDeck, playerCards);
-    const { score: metaScore, sampleCount, inferredArchetypeId } = await calcMetaScore(metaDeck, arenaId, localMeta, lossMeta, battleCount);
+    const { score: metaScore, sampleCount, inferredArchetypeId } = await calcMetaScore(metaDeck, arenaId, trophies, localMeta, lossMeta, battleCount);
     const structureScore = calcStructureScore(metaDeck, playerCards, arenaAirDeckRatio);
     const costScore = calcCostScore(metaDeck);
 
