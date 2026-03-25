@@ -309,6 +309,7 @@ function calcCostScore(metaDeck: MetaDeck): number {
         const center = (idealMin + idealMax) / 2;
         const distFromCenter = Math.abs(avg - center);
         const range = (idealMax - idealMin) / 2;
+        if (range === 0) return 100;
         return Math.round(100 - (distFromCenter / range) * 15);
     }
 

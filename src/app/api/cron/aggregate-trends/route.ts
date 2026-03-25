@@ -172,9 +172,11 @@ export async function GET(req: NextRequest) {
             // ArenaDeckStats 形式に変換してフロントエンドが直接利用できる形で保存
             const topDecks = topScores.map(d => {
                 const cards: string[] = deckCardsMap.get(d.deck_key) ??
-                    d.deck_key.split("_").map((c: string) =>
-                        c.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-                    );
+                    d.deck_key.split("_")
+                        .filter((c: string) => c !== "evo" && c !== "hero")
+                        .map((c: string) =>
+                            c.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+                        );
                 const trend: "up" | "down" | "stable" =
                     d.wr_delta > 0.02 ? "up" : d.wr_delta < -0.02 ? "down" : "stable";
                 const useRate = totalBattles7d > 0

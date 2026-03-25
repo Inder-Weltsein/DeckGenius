@@ -124,10 +124,11 @@ export function generateCoachMessage(
     const top1 = localMeta[0];
     const top2 = localMeta[1];
 
-    const losses = battles.filter(
+    const recentBattles = battles.slice(0, 25);
+    const losses = recentBattles.filter(
         b => (b.team?.[0]?.crowns ?? b.team?.[0]?.crownsEarned ?? 0) < (b.opponent?.[0]?.crowns ?? b.opponent?.[0]?.crownsEarned ?? 0)
     );
-    const totalCount = Math.min(battles.length, 25);
+    const totalCount = recentBattles.length;
     const winCount = totalCount - losses.length;
     const winRate = totalCount > 0 ? Math.round((winCount / totalCount) * 100) : 50;
 

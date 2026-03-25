@@ -31,8 +31,8 @@ function parseEvoInfoFromDeckId(deckId: string, cards: string[]): { evoCards: Se
         if (tokens[i] === "evo" || tokens[i] === "hero") {
             const baseToken = tokens[i - 1];
             for (const card of cards) {
-                // cardToKeyPart と同じ正規化: スペース・アポストロフィ・ピリオド → ハイフン
-                const normalized = card.toLowerCase().replace(/[' .]/g, "-");
+                // cardToKeyPart と同じ正規化: trim().toLowerCase() のみ（ハイフン変換なし）
+                const normalized = card.trim().toLowerCase();
                 if (normalized === baseToken) {
                     if (tokens[i] === "evo") evoCards.add(card);
                     else heroCards.add(card);
@@ -45,6 +45,17 @@ function parseEvoInfoFromDeckId(deckId: string, cards: string[]): { evoCards: Se
 }
 type RarityFilter = "all" | "common" | "rare" | "epic" | "legendary" | "champion";
 type TierFilter = "all" | "top" | "middle";
+
+// アリーナIDをDBカテゴリIDへ変換（matchup_stats の arena_id と対応）
+function arenaIdToDbCategory(arenaId: string): string {
+    if (arenaId === "arena_22" || arenaId === "arena_23") return "ultimate";
+    if (arenaId === "arena_19" || arenaId === "arena_20" || arenaId === "arena_21") return "top-ladder";
+    if (arenaId === "arena_17" || arenaId === "arena_18") return "grandmaster";
+    if (arenaId === "arena_15" || arenaId === "arena_16") return "champion";
+    if (arenaId === "arena_12" || arenaId === "arena_13" || arenaId === "arena_14") return "master";
+    if (arenaId === "arena_9"  || arenaId === "arena_10" || arenaId === "arena_11") return "challenger";
+    return "beginner";
+}
 
 // アリーナIDをTierに分類
 const ARENA_TIER_MAP: Record<string, TierFilter> = {
@@ -110,7 +121,8 @@ function ArenaPageInner() {
         if (next && !matchupData[next]) {
             setMatchupLoading(next);
             try {
-                const res = await fetch(`/api/matchup?arena=${arenaId}&deck=${encodeURIComponent(next)}`);
+                const dbCategory = arenaIdToDbCategory(arenaId);
+                const res = await fetch(`/api/matchup?arena=${dbCategory}&deck=${encodeURIComponent(next)}`);
                 const d: MatchupData = await res.json();
                 setMatchupData(prev => ({ ...prev, [next]: d }));
             } catch { /* fallback: empty */ }

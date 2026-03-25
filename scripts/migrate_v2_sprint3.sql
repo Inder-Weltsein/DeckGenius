@@ -26,8 +26,19 @@ CREATE INDEX IF NOT EXISTS idx_matchup_opponent
     ON public.matchup_stats (arena_id, opponent_deck_key, win_rate DESC);
 
 ALTER TABLE public.matchup_stats ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "matchup_stats public read"
-    ON public.matchup_stats FOR SELECT TO anon USING (true);
+-- CREATE POLICY は IF NOT EXISTS 非対応のため DO ブロックで冪等実行
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename  = 'matchup_stats'
+          AND policyname = 'matchup_stats public read'
+    ) THEN
+        CREATE POLICY "matchup_stats public read"
+            ON public.matchup_stats FOR SELECT TO anon USING (true);
+    END IF;
+END $$;
 
 -- 2. recommend_logs の統計ビュー（表示用）
 CREATE OR REPLACE VIEW public.recommend_logs_stats AS

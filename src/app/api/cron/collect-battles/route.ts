@@ -298,7 +298,7 @@ export async function GET(req: NextRequest) {
                 errors.push(`${player.player_tag}: ${String(err)}`);
                 await supabase
                     .from("player_pool")
-                    .update({ visited: true })
+                    .update({ visited: true, last_collected: new Date().toISOString() })
                     .eq("player_tag", player.player_tag);
             }
         }
