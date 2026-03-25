@@ -26,9 +26,9 @@ function deckKeyToLabel(deckKey: string): string {
             }
             i++;
         } else {
-            // ハイフン区切りのカード名を復元
+            // スペース区切りのカード名を復元（deck_keyはcard.name.toLowerCase()でスペース保持）
             const cardName = tokens[i]
-                .split("-")
+                .split(" ")
                 .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
                 .join(" ");
             parts.push(ja(cardName) || cardName);

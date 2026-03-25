@@ -175,7 +175,7 @@ export async function GET(req: NextRequest) {
                     d.deck_key.split("_")
                         .filter((c: string) => c !== "evo" && c !== "hero")
                         .map((c: string) =>
-                            c.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+                            c.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
                         );
                 const trend: "up" | "down" | "stable" =
                     d.wr_delta > 0.02 ? "up" : d.wr_delta < -0.02 ? "down" : "stable";

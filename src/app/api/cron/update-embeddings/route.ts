@@ -61,8 +61,8 @@ export async function GET(request: Request) {
 
         for (const deckKey of missingKeys) {
             try {
-                // deck_keyはカード名が"_"で連結されているため、配列に戻す
-                const cardNames = deckKey.split("_");
+                // deck_keyはカード名が"_"で連結（evo/heroサフィックストークンは除外）
+                const cardNames = deckKey.split("_").filter((t: string) => t !== "evo" && t !== "hero");
                 
                 // Geminiを使って768次元ベクトルを生成
                 const embedding = await deckToVector(cardNames);
