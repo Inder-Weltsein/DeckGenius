@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useMemo } from "react";
 
 interface NeonGaugeProps {
   score: number;        // 0〜100
@@ -17,14 +16,10 @@ export function NeonGauge({ score, size = 160, label, sublabel }: NeonGaugeProps
   const radius = 54;
   const center = size / 2;
   const strokeWidth = 8;
-  const circumference = 2 * Math.PI * radius; // ≈ 339.3
 
   // 上部30°を空けて270°分を使う（時計12時 → 時計3時 → 時計6時 → 時計9時 → 時計12時手前）
   const totalArc = 270; // 度数
   const arcRatio = (clamped / 100) * totalArc;
-  const arcLength = (arcRatio / 360) * circumference;
-  const dashOffset = circumference - arcLength;
-
   // スコアに応じた色
   const getColor = (s: number) => {
     if (s >= 80) return { stroke: "#0dccf2", glow: "rgba(13,204,242,0.6)" };

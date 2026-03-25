@@ -392,13 +392,8 @@ const ARENA_DECKS_MAP: Record<string, ArenaDeckStats[]> = {
 
 // 内部でトロフィー数から表示用のダミーデッキを取得する専用関数（アリーナのID判定用、フォールバックとして残す）
 export function getFallbackDecksByArenaId(arenaId: string): ArenaDeckStats[] {
-    if (arenaId === "arena_22" || arenaId === "arena_23") return ULTIMATE_DECKS;
-    if (arenaId === "arena_19" || arenaId === "arena_20" || arenaId === "arena_21") return TOP_LADDER_DECKS;
-    if (arenaId === "arena_17" || arenaId === "arena_18") return GRANDMASTER_DECKS;
-    if (arenaId === "arena_15" || arenaId === "arena_16") return CHAMPION_DECKS;
-    if (arenaId === "arena_12" || arenaId === "arena_13" || arenaId === "arena_14") return MASTER_DECKS;
-    if (arenaId === "arena_9" || arenaId === "arena_10" || arenaId === "arena_11") return CHALLENGER_DECKS;
-    return BEGINNER_DECKS;
+    const categoryId = getArenaCategoryId(arenaId);
+    return ARENA_DECKS_MAP[categoryId] ?? BEGINNER_DECKS;
 }
 
 /** アリーナカテゴリIDへのマッピングヘルパー */

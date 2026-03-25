@@ -16,6 +16,16 @@ const eslintConfig = defineConfig([
     "check_db.js",
     "scripts/**",
   ]),
+  // カスタムルール設定
+  {
+    rules: {
+      // _ プレフィックス付き変数は意図的な未使用パラメータとして許可
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+      }],
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -7,8 +7,8 @@
 
 import type { Battle, CRCard } from "./clashApi";
 import { META_DECKS, type MetaDeck } from "./metaDecks";
-import { getArenaByTrophies, fetchArenaMetaFromDB, ARENAS, type Arena, type ArenaMetaInfo } from "./arenaMeta";
-import { checkRoles, ja, type RoleCheckResult } from "./cards";
+import { getArenaByTrophies, fetchArenaMetaFromDB, type Arena, type ArenaMetaInfo } from "./arenaMeta";
+import { ja, type RoleCheckResult } from "./cards";
 import {
     toAbsoluteCards,
     analyzeLocalMeta,
@@ -17,7 +17,6 @@ import {
     type ScoredDeck,
     type TOCScoreBreakdown,
 } from "./engine/tocEngine";
-import { getArenaTierFromId } from "./engine/arenaWeights";
 
 // ===== 型定義 =====
 
@@ -97,9 +96,7 @@ export function calcUpgradePriority(resolvedCards: CRCard[], topN = 3): UpgradeC
     return resolvedCards
         .filter(c => c.level < 15)
         .sort((a, b) => {
-            // win_conditionを最優先（設計書 §5）
-            const aIsWC = a.name ? 1 : 0; // checkRolesで確認
-            const bIsWC = b.name ? 1 : 0;
+                // レベル差が大きいカードを優先（設計書 §5）
             const gapA = 15 - a.level;
             const gapB = 15 - b.level;
             return gapB - gapA;

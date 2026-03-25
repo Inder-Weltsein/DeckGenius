@@ -8,10 +8,10 @@
 
 import type { CRCard, Battle } from "../clashApi";
 import type { MetaDeck } from "../metaDecks";
-import { checkRoles, countTag, hasTag, type RoleCheckResult } from "../cards";
+import { checkRoles, hasTag, type RoleCheckResult } from "../cards";
 import { getCardDef } from "../cards";
 import { isPlayable } from "./hardFilter";
-import { getArenaTier, getTOCWeights, type ArenaTier } from "./arenaWeights";
+import { getArenaTier, getTOCWeights } from "./arenaWeights";
 import { generateDeckKey } from "./deckKey";
 import { supabase } from "../supabaseClient";
 import { deckToVector } from "./embedding/vectorize";
