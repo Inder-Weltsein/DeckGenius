@@ -206,6 +206,54 @@ export async function GET(req: NextRequest) {
             results[arenaId] = { decks: upsertRecords.length, battles: battles7d.length };
         }
 
+        // ─────────────────────────────────────────────────────────────
+        // [Sprint 3] マッチアップ行列集計
+        // raw_battles の opponent_deck_key を使いデッキ対決勝率を集計
+        // ─────────────────────────────────────────────────────────────
+        try {
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            const { data: matchupBattles } = await supabase
+                .from("raw_battles")
+                .select("arena_id, deck_key, opponent_deck_key, is_win")
+                .gte("battle_time", sevenDaysAgo.toISOString())
+                .not("opponent_deck_key", "is", null);
+
+            if (matchupBattles && matchupBattles.length > 0) {
+                // arena × deck_key × opponent_deck_key 単位で集計
+                const matchupMap = new Map<string, { wins: number; total: number }>();
+                for (const b of matchupBattles) {
+                    if (!b.opponent_deck_key) continue;
+                    const key = `${b.arena_id}||${b.deck_key}||${b.opponent_deck_key}`;
+                    const cur = matchupMap.get(key) ?? { wins: 0, total: 0 };
+                    cur.total++;
+                    if (b.is_win) cur.wins++;
+                    matchupMap.set(key, cur);
+                }
+
+                // MIN_MATCHUP_SAMPLE = 5件以上のみ保存（ノイズ除去）
+                const matchupRecords = [];
+                for (const [key, stats] of matchupMap.entries()) {
+                    if (stats.total < 5) continue;
+                    const [arena_id, deck_key, opponent_deck_key] = key.split("||");
+                    matchupRecords.push({
+                        arena_id, deck_key, opponent_deck_key,
+                        wins: stats.wins,
+                        total: stats.total,
+                        updated_at: new Date().toISOString(),
+                    });
+                }
+
+                if (matchupRecords.length > 0) {
+                    await supabase
+                        .from("matchup_stats")
+                        .upsert(matchupRecords, { onConflict: "arena_id,deck_key,opponent_deck_key" });
+                    console.log(`[aggregate-trends] マッチアップ行列: ${matchupRecords.length}件更新`);
+                }
+            }
+        } catch (matchupErr) {
+            console.warn("[aggregate-trends] マッチアップ集計エラー（無視）:", matchupErr);
+        }
+
         const elapsed = Date.now() - startTime;
 
         // ─────────────────────────────────────────────────────────────

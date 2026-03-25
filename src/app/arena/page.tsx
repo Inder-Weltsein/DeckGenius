@@ -18,6 +18,17 @@ type ApiResponse = {
 type ViewMode = "decks" | "cards";
 type CardTypeFilter = "all" | "troop" | "spell" | "building";
 type RarityFilter = "all" | "common" | "rare" | "epic" | "legendary" | "champion";
+type TierFilter = "all" | "top" | "middle";
+
+// アリーナIDをTierに分類
+const ARENA_TIER_MAP: Record<string, TierFilter> = {
+    "arena_22": "top", "arena_23": "top",
+    "arena_19": "top", "arena_20": "top", "arena_21": "top",
+    "arena_17": "top", "arena_18": "top",
+    "arena_15": "middle", "arena_16": "middle",
+    "arena_12": "middle", "arena_13": "middle", "arena_14": "middle",
+    "arena_9":  "middle", "arena_10": "middle", "arena_11": "middle",
+};
 
 function ArenaPageInner() {
     const router = useRouter();
@@ -33,6 +44,7 @@ function ArenaPageInner() {
     const [cardTypeFilter, setCardTypeFilter] = useState<CardTypeFilter>("all");
     const [rarityFilter, setRarityFilter] = useState<RarityFilter>("all");
     const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
+    const [tierFilter, setTierFilter] = useState<TierFilter>("all");
 
     useEffect(() => {
         const params = initialTrophies
@@ -120,6 +132,32 @@ function ArenaPageInner() {
             </div>
 
             <div className="max-w-2xl mx-auto flex flex-col gap-5 relative z-10">
+                {/* Tier タブ */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex gap-2"
+                >
+                    {(["all", "top", "middle"] as TierFilter[]).map((tier) => {
+                        const label = tier === "all" ? "🌐 全帯" : tier === "top" ? "👑 Top帯 (6000+)" : "⚔️ Middle帯 (4000〜6000)";
+                        const isActive = tierFilter === tier;
+                        return (
+                            <button
+                                key={tier}
+                                onClick={() => setTierFilter(tier)}
+                                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                                style={isActive
+                                    ? { background: "linear-gradient(135deg,#7c3aed88,#0dccf288)", border: "1px solid rgba(13,204,242,0.5)", color: "#fff" }
+                                    : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#9ca3af" }
+                                }
+                            >
+                                {label}
+                            </button>
+                        );
+                    })}
+                </motion.div>
+
                 {/* アリーナセレクター */}
                 <motion.div
                     initial={{ opacity: 0, y: 15 }}
@@ -127,7 +165,10 @@ function ArenaPageInner() {
                     transition={{ duration: 0.4 }}
                 >
                     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                        {data.allArenas.map((arena) => (
+                        {data.allArenas.filter(arena => {
+                            if (tierFilter === "all") return true;
+                            return ARENA_TIER_MAP[arena.id] === tierFilter;
+                        }).map((arena) => (
                             <button
                                 key={arena.id}
                                 onClick={() => handleArenaChange(arena.id)}

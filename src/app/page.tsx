@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Zap, Shield, TrendingUp, ChevronRight } from "lucide-react";
 
 // Vercel が自動設定するビルド情報（ローカルでは undefined）
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "2.0.0";
 const COMMIT_SHA = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";
 const BUILD_DATE = new Date().toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit" });
 
@@ -27,7 +27,16 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [animStyle, setAnimStyle] = useState<"cyber" | "pop">("pop");
   const [selectedArena, setSelectedArena] = useState("champion");
+  const [usageCount, setUsageCount] = useState<number | null>(null);
   const router = useRouter();
+
+  // recommend_logsから利用者数を取得（/api/stats）
+  useEffect(() => {
+    fetch("/api/stats")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.totalRequests) setUsageCount(d.totalRequests); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("deckgenius_theme") as "cyber" | "pop" | null;
@@ -356,6 +365,9 @@ export default function HomePage() {
           >
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse" />
             v{APP_VERSION} · #{COMMIT_SHA}
+            {usageCount !== null && usageCount > 0 && (
+              <span className="ml-1 opacity-70">· {usageCount.toLocaleString()}回推薦済</span>
+            )}
           </span>
         </motion.div>
       </div>
