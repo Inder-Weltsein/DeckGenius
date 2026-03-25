@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Trophy, Sparkles, Copy, Check, BarChart3, ExternalLink, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Trophy, Sparkles, Copy, Check, BarChart3, ExternalLink, AlertTriangle, Crown } from "lucide-react";
 import type { AnalysisResult } from "@/lib/analyzer";
 import type { CRCard } from "@/lib/clashApi";
 import { ja, getCardDef } from "@/lib/cards";
@@ -281,9 +281,32 @@ export default function ResultPage() {
                                             <div className="w-full aspect-square rounded-lg flex items-center justify-center text-xl relative z-10" style={{ background: "rgba(255,255,255,0.05)" }}>🃏</div>
                                         )}
 
+                                        {/* 左上: Evoバッジ */}
                                         {isEvo && (
                                             <div className="absolute top-1 left-1 z-20" title="限界突破（Evolution）">
                                                 <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                                            </div>
+                                        )}
+
+                                        {/* 右上: Championバッジ（Evoと重複しない） */}
+                                        {isChampion && !isEvo && (
+                                            <div
+                                                className="absolute top-1 right-1 z-20 flex items-center justify-center w-4 h-4 rounded-full"
+                                                style={{ background: "rgba(250,204,21,0.25)", border: "1px solid rgba(250,204,21,0.5)" }}
+                                                title="チャンピオン（ヒーロー）"
+                                            >
+                                                <Crown className="w-2.5 h-2.5 text-yellow-400" />
+                                            </div>
+                                        )}
+
+                                        {/* Evo + Champion（限界突破チャンピオン）の場合は両方表示 */}
+                                        {isChampion && isEvo && (
+                                            <div
+                                                className="absolute top-1 right-1 z-20 flex items-center justify-center w-4 h-4 rounded-full"
+                                                style={{ background: "rgba(168,85,247,0.3)", border: "1px solid rgba(250,204,21,0.5)" }}
+                                                title="限界突破チャンピオン"
+                                            >
+                                                <Crown className="w-2.5 h-2.5 text-yellow-300" />
                                             </div>
                                         )}
 

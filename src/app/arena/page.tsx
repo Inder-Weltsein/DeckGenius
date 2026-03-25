@@ -3,9 +3,9 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, Flame, Crown, BarChart3, Filter } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, Flame, Crown, BarChart3, Filter, Sparkles, Swords } from "lucide-react";
 import type { Arena, ArenaDeckStats, ArenaCardStats } from "@/lib/arenaMeta";
-import { ja } from "@/lib/cards";
+import { ja, getCardDef } from "@/lib/cards";
 
 type ApiResponse = {
     arena: Arena;
@@ -15,8 +15,34 @@ type ApiResponse = {
     allArenas: Arena[];
 };
 
+type MatchupRow = { deckKey: string; label: string; winRate: number; total: number };
+type MatchupData = { counters: MatchupRow[]; victims: MatchupRow[] };
+
 type ViewMode = "decks" | "cards";
 type CardTypeFilter = "all" | "troop" | "spell" | "building";
+
+// ===== デッキキーから evo/hero カードを解析するヘルパー =====
+// deck_key 形式: "archers_goblin-barrel_evo_hog-rider_..." （_区切り、_evo/_heroはサフィックス）
+function parseEvoInfoFromDeckId(deckId: string, cards: string[]): { evoCards: Set<string>; heroCards: Set<string> } {
+    const evoCards = new Set<string>();
+    const heroCards = new Set<string>();
+    const tokens = deckId.split("_");
+    for (let i = 1; i < tokens.length; i++) {
+        if (tokens[i] === "evo" || tokens[i] === "hero") {
+            const baseToken = tokens[i - 1];
+            for (const card of cards) {
+                // cardToKeyPart と同じ正規化: スペース・アポストロフィ・ピリオド → ハイフン
+                const normalized = card.toLowerCase().replace(/[' .]/g, "-");
+                if (normalized === baseToken) {
+                    if (tokens[i] === "evo") evoCards.add(card);
+                    else heroCards.add(card);
+                    break;
+                }
+            }
+        }
+    }
+    return { evoCards, heroCards };
+}
 type RarityFilter = "all" | "common" | "rare" | "epic" | "legendary" | "champion";
 type TierFilter = "all" | "top" | "middle";
 
@@ -45,6 +71,8 @@ function ArenaPageInner() {
     const [rarityFilter, setRarityFilter] = useState<RarityFilter>("all");
     const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
     const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+    const [matchupData, setMatchupData] = useState<Record<string, MatchupData>>({});
+    const [matchupLoading, setMatchupLoading] = useState<string | null>(null);
 
     useEffect(() => {
         const params = initialTrophies
@@ -72,6 +100,22 @@ function ArenaPageInner() {
     function handleArenaChange(arenaId: string) {
         setSelectedArenaId(arenaId);
         fetchArenaData(`id=${arenaId}`);
+        setMatchupData({});
+        setExpandedDeckId(null);
+    }
+
+    async function handleDeckExpand(deckId: string, arenaId: string) {
+        const next = expandedDeckId === deckId ? null : deckId;
+        setExpandedDeckId(next);
+        if (next && !matchupData[next]) {
+            setMatchupLoading(next);
+            try {
+                const res = await fetch(`/api/matchup?arena=${arenaId}&deck=${encodeURIComponent(next)}`);
+                const d: MatchupData = await res.json();
+                setMatchupData(prev => ({ ...prev, [next]: d }));
+            } catch { /* fallback: empty */ }
+            finally { setMatchupLoading(null); }
+        }
     }
 
     const trendIcon = (trend: "up" | "down" | "stable") => {
@@ -279,7 +323,7 @@ function ArenaPageInner() {
                                     >
                                         <div
                                             className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
-                                            onClick={() => setExpandedDeckId(prev => prev === deck.deckId ? null : deck.deckId)}
+                                            onClick={() => handleDeckExpand(deck.deckId, data.arena.id)}
                                         >
                                             <div className="flex items-center justify-between mb-2 sm:mb-0">
                                                 <div className="flex items-center gap-2.5">
@@ -344,42 +388,157 @@ function ArenaPageInner() {
                                         </div>
 
                                         <AnimatePresence>
-                                            {expandedDeckId === deck.deckId && (
-                                                <motion.div
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: "auto", opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                                                    className="border-t border-white/5 bg-[var(--glass-bg)]"
-                                                >
-                                                    <div className="p-4 grid grid-cols-4 sm:grid-cols-8 gap-2">
-                                                        {deck.cards.map((cardName, _i) => {
-                                                            const slug = cardName.toLowerCase().replace(/['.]/g, '').replace(/\s+/g, '-');
-                                                            const iconUrl = `https://royaleapi.github.io/cr-api-assets/cards/${slug}.png`;
+                                            {expandedDeckId === deck.deckId && (() => {
+                                                const { evoCards, heroCards } = parseEvoInfoFromDeckId(deck.deckId, deck.cards);
+                                                return (
+                                                    <motion.div
+                                                        initial={{ height: 0, opacity: 0 }}
+                                                        animate={{ height: "auto", opacity: 1 }}
+                                                        exit={{ height: 0, opacity: 0 }}
+                                                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                                                        className="border-t border-white/5 bg-[var(--glass-bg)]"
+                                                    >
+                                                        <div className="p-4 grid grid-cols-4 sm:grid-cols-8 gap-2">
+                                                            {deck.cards.map((cardName, _i) => {
+                                                                const isEvo      = evoCards.has(cardName);
+                                                                const isHero     = heroCards.has(cardName);
+                                                                const rarity     = getCardDef(cardName)?.rarity ?? "common";
+                                                                const isChampion = rarity === "champion";
+                                                                const isLegendary = rarity === "legendary";
+                                                                const isEpic     = rarity === "epic";
+
+                                                                // アイコンURL: evo はroyaleapi CDNにevo画像がないため通常アイコン使用
+                                                                const slug = cardName.toLowerCase().replace(/['.]/g, "").replace(/\s+/g, "-");
+                                                                const iconUrl = `https://royaleapi.github.io/cr-api-assets/cards/${slug}.png`;
+
+                                                                // ボーダー・グロー設定
+                                                                let borderColor = "rgba(255,255,255,0.06)";
+                                                                let boxShadow = "none";
+                                                                let bgGlow: string | null = null;
+
+                                                                if (isEvo || isHero) {
+                                                                    borderColor = "rgba(168,85,247,0.55)";
+                                                                    boxShadow   = "0 0 10px rgba(168,85,247,0.25)";
+                                                                    bgGlow = "radial-gradient(circle at center, rgba(168,85,247,0.12) 0%, transparent 70%)";
+                                                                } else if (isChampion) {
+                                                                    borderColor = "rgba(250,204,21,0.55)";
+                                                                    boxShadow   = "0 0 10px rgba(250,204,21,0.18)";
+                                                                    bgGlow = "radial-gradient(circle at center, rgba(250,204,21,0.08) 0%, transparent 70%)";
+                                                                } else if (isLegendary) {
+                                                                    borderColor = "rgba(14,165,233,0.4)";
+                                                                } else if (isEpic) {
+                                                                    borderColor = "rgba(192,132,252,0.35)";
+                                                                }
+
+                                                                return (
+                                                                    <motion.div
+                                                                        key={cardName}
+                                                                        className="glass-card flex flex-col items-center gap-1 p-1 sm:p-2 relative overflow-hidden"
+                                                                        style={{ borderColor, boxShadow }}
+                                                                        initial={{ opacity: 0, scale: 0.9 }}
+                                                                        animate={{ opacity: 1, scale: 1 }}
+                                                                        transition={{ delay: _i * 0.03 }}
+                                                                    >
+                                                                        {/* 背景グロー */}
+                                                                        {bgGlow && (
+                                                                            <div className="absolute inset-0 pointer-events-none" style={{ background: bgGlow }} />
+                                                                        )}
+
+                                                                        {/* 左上: Evoバッジ */}
+                                                                        {(isEvo || isHero) && (
+                                                                            <div
+                                                                                className="absolute top-0.5 left-0.5 z-20 flex items-center justify-center w-3.5 h-3.5 rounded-full"
+                                                                                style={{ background: "rgba(168,85,247,0.4)" }}
+                                                                                title={isHero ? "ヒーロー（Hero）" : "限界突破（Evolution）"}
+                                                                            >
+                                                                                <Sparkles className="w-2 h-2 text-purple-300" />
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* 右上: Championバッジ */}
+                                                                        {isChampion && (
+                                                                            <div
+                                                                                className="absolute top-0.5 right-0.5 z-20 flex items-center justify-center w-3.5 h-3.5 rounded-full"
+                                                                                style={{ background: "rgba(250,204,21,0.3)" }}
+                                                                                title="チャンピオン"
+                                                                            >
+                                                                                <Crown className="w-2 h-2 text-yellow-400" />
+                                                                            </div>
+                                                                        )}
+
+                                                                        <img
+                                                                            src={iconUrl}
+                                                                            alt={cardName}
+                                                                            className="w-full aspect-square object-contain rounded-lg relative z-10"
+                                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                                                        />
+                                                                        <p className="text-[var(--text-muted)] text-center leading-none mt-1 relative z-10" style={{ fontSize: "0.55rem" }}>
+                                                                            {ja(cardName)}
+                                                                        </p>
+                                                                    </motion.div>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        {/* ===== マッチアップ（カウンター）セクション ===== */}
+                                                        {(() => {
+                                                            const mu = matchupData[deck.deckId];
+                                                            const isLoading = matchupLoading === deck.deckId;
+                                                            const hasData = mu && (mu.counters.length > 0 || mu.victims.length > 0);
+
+                                                            if (isLoading) {
+                                                                return (
+                                                                    <div className="px-4 pb-4 flex items-center gap-2 text-xs text-gray-500">
+                                                                        <div className="w-3 h-3 rounded-full border border-cyan-400 border-t-transparent animate-spin" />
+                                                                        マッチアップデータを取得中...
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            if (!hasData) {
+                                                                return (
+                                                                    <div className="px-4 pb-3 text-xs text-gray-600 italic">
+                                                                        マッチアップデータなし（収集中）
+                                                                    </div>
+                                                                );
+                                                            }
                                                             return (
-                                                                <motion.div
-                                                                    key={cardName}
-                                                                    className="glass-card flex flex-col items-center gap-1 p-1 sm:p-2 relative overflow-hidden"
-                                                                    style={{ borderColor: "rgba(255,255,255,0.06)" }}
-                                                                    initial={{ opacity: 0, scale: 0.9 }}
-                                                                    animate={{ opacity: 1, scale: 1 }}
-                                                                    transition={{ delay: _i * 0.03 }}
-                                                                >
-                                                                    <img
-                                                                        src={iconUrl}
-                                                                        alt={cardName}
-                                                                        className="w-full aspect-square object-contain rounded-lg relative z-10"
-                                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                                                                    />
-                                                                    <p className="text-[var(--text-muted)] text-center leading-none mt-1" style={{ fontSize: "0.55rem" }}>
-                                                                        {ja(cardName)}
-                                                                    </p>
-                                                                </motion.div>
+                                                                <div className="px-4 pb-4 grid grid-cols-2 gap-3 border-t border-white/5 pt-3">
+                                                                    {/* 苦手なデッキ */}
+                                                                    <div>
+                                                                        <div className="flex items-center gap-1 mb-2">
+                                                                            <Swords className="w-3 h-3 text-red-400" />
+                                                                            <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">苦手な相手</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-1">
+                                                                            {mu.counters.map(r => (
+                                                                                <div key={r.deckKey} className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg" style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.12)" }}>
+                                                                                    <span className="text-[10px] text-gray-300 truncate">{r.label}</span>
+                                                                                    <span className="text-[10px] font-bold flex-shrink-0" style={{ color: "#f87171" }}>{r.winRate}%</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* 得意なデッキ */}
+                                                                    <div>
+                                                                        <div className="flex items-center gap-1 mb-2">
+                                                                            <TrendingUp className="w-3 h-3 text-green-400" />
+                                                                            <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider">得意な相手</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-1">
+                                                                            {mu.victims.map(r => (
+                                                                                <div key={r.deckKey} className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg" style={{ background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.12)" }}>
+                                                                                    <span className="text-[10px] text-gray-300 truncate">{r.label}</span>
+                                                                                    <span className="text-[10px] font-bold flex-shrink-0" style={{ color: "#4ade80" }}>{r.winRate}%</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
                                                             );
-                                                        })}
-                                                    </div>
-                                                </motion.div>
-                                            )}
+                                                        })()}
+                                                    </motion.div>
+                                                );
+                                            })()}
                                         </AnimatePresence>
                                     </motion.div>
                                 ))}
