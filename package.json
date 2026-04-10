@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@supabase/supabase-js": "^2.98.0",
+    "@supabase/supabase-js": "^2.101.1",
     "@upstash/redis": "^1.36.2",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",
